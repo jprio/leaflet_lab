@@ -5,39 +5,42 @@
     <base target="_top">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <title>Quick Start - Leaflet</title>
 
-
-
-    <script src="https://apis.google.com/js/platform.js" async defer></script>
-    <!-- <div class="g-signin2" data-onsuccess="onSignIn"></div> -->
     <script>
-        function onSignIn(googleUser) {
-            var profile = googleUser.getBasicProfile();
-            console.log('ID: ' + profile.getId()); // Do not send to your backend! Use an ID token instead.
-            console.log('Name: ' + profile.getName());
-            console.log('Image URL: ' + profile.getImageUrl());
-            console.log('Email: ' + profile.getEmail()); // This is null if the 'email' scope is not present.
+        function decodeJWT(token) {
+            let base64Url = token.split('.');
+            let base64 = base64Url[1].replace(/-/g, "+").replace(/_/g, "/");
+            let jsonPayload = decodeURIComponent(
+                atob(base64)
+                    .split("")
+                    .map(function (c) {
+                        return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+                    })
+                    .join("")
+            );
+            return JSON.parse(jsonPayload);
+        }
+        function handleCredentialResponse(googleUser) {
+            // console.log(googleUser)
+            // console.log(googleUser['credential'])
+            const responsePayload = decodeJWT(googleUser.credential);
+            console.log(responsePayload.email);
+            console.log(responsePayload.name);
+            console.log(responsePayload.sub);
+            document.getElementById('g_id_signin').style.display = 'none';
         }
     </script>
-    <a href="#" onclick="signOut();">Sign out</a>
-
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <div id="g_id_onload" data-client_id="761192347980-3fabcdsminc6inubv77dcv4j76legtfc.apps.googleusercontent.com"
-        data-callback="handleCredentialResponse">
+        data-context="signin" data-ux_mode="popup" data-login_uri="https://laughing-umbrella-p75jgv4prf75v9.github.dev/"
+        data-auto_prompt="false" data-callback="handleCredentialResponse">
     </div>
-    <div class="g_id_signin" data-type="standard"></div>
-    <!--
-    <div id="g_id_onload" data-client_id="761192347980-3fabcdsminc6inubv77dcv4j76legtfc.apps.googleusercontent.com"
-        data-context="signin" data-ux_mode="popup" data-login_uri="http://www" data-auto_prompt="false">
+    <div id="g_id_signin" class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline"
+        data-text="signin_with" data-size="large" data-logo_alignment="left">
     </div>
 
-    <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with"
-        data-size="large" data-logo_alignment="left">
-    </div>
--->
     <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
 
 
