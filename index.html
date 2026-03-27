@@ -7,10 +7,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>Quick Start - Leaflet</title>
+
+
+
     <script src="https://apis.google.com/js/platform.js" async defer></script>
-    <meta name="google-signin-client_id"
-        content="761192347980-3fabcdsminc6inubv77dcv4j76legtfc.apps.googleusercontent.com">
-    <div class="g-signin2" data-onsuccess="onSignIn"></div>
+    <!-- <div class="g-signin2" data-onsuccess="onSignIn"></div> -->
     <script>
         function onSignIn(googleUser) {
             var profile = googleUser.getBasicProfile();
@@ -21,17 +22,24 @@
         }
     </script>
     <a href="#" onclick="signOut();">Sign out</a>
-    <script>
-        function signOut() {
-            var auth2 = gapi.auth2.getAuthInstance();
-            auth2.signOut().then(function () {
-                console.log('User signed out.');
-            });
-        }
-    </script>
+
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <div id="g_id_onload" data-client_id="761192347980-3fabcdsminc6inubv77dcv4j76legtfc.apps.googleusercontent.com"
+        data-callback="handleCredentialResponse">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+    <!--
+    <div id="g_id_onload" data-client_id="761192347980-3fabcdsminc6inubv77dcv4j76legtfc.apps.googleusercontent.com"
+        data-context="signin" data-ux_mode="popup" data-login_uri="http://www" data-auto_prompt="false">
+    </div>
+
+    <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with"
+        data-size="large" data-logo_alignment="left">
+    </div>
+-->
     <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
 
-    <link rel="stylesheet" href="nom de domaine/css/Control.FullScreen.css" type="text/css">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
         integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="
@@ -57,7 +65,6 @@
             max-height: 100%;
         }
     </style>
-
 
 </head>
 
