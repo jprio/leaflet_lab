@@ -35,9 +35,9 @@
                 <div> {% if 'user' in session %}
                     <span>Welcome, {{ session['user']['email'] }}!</span>
                     <span><img src="{{ session['user']['picture'] }}"></span>
-                    <a href="/logout">Logout</a>
+                    <a href="/auth/logout">Logout</a>
                     {% else %}
-                    <a href="/login">Login</a>
+                    <a href="/auth/login">Login</a>
                     {% endif %}
                 </div>
             </nav>
@@ -100,11 +100,10 @@
             <h2>Trail List</h2>
             {% for track in track_list %}
             <div class="trail-item" onclick="selectTrail('{{ track }}')">
-                <h3>{{track.name}}</h3>
+                <h3>{{track.name}}<span class=" difficulty hard">Hard</span></h3>
                 <p>📍 description</p>
                 <p>distance : {{track.length}}</p>
                 <p>type : {{track.type}}</p>
-                <span class=" difficulty hard">Hard</span>
             </div>
             {% endfor %}
         </div>
@@ -122,6 +121,7 @@
             <div id="trail-info">
             </div>
             <!-- <div id="elevation-div">{{ map_detail | safe }}</div> -->
+
         </div>
     </main>
 
@@ -188,7 +188,7 @@
                 detached: true,
 
                 // if (detached), the elevation chart container
-                elevationDiv: "#elevation-div",
+                // elevationDiv: "#elevation-div",
 
                 // if (!detached) autohide chart profile on chart mouseleave
                 autohide: false,
@@ -282,9 +282,11 @@
 
             // Instantiate map (leaflet-ui).
             var map = L.map('map_detail', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
+            // var map2 = L.map('ma_carte_unique123', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
 
             // Instantiate elevation control.
             var controlElevation = L.control.elevation(elevation_options).addTo(map);
+            // var controlElevation2 = L.control.elevation(elevation_options).addTo(map2);
 
             // Rendre controlElevation accessible globalement
             window.controlElevation = controlElevation;
@@ -298,7 +300,7 @@
             // }
 
             // Load track from url (allowed data types: "*.geojson", "*.gpx", "*.tcx")
-            controlElevation.load("https://raruto.github.io/leaflet-elevation/examples/via-emilia.gpx");
+            // controlElevation.load("https://raruto.github.io/leaflet-elevation/examples/via-emilia.gpx");
 
         </script>
 </body>

@@ -16,6 +16,7 @@ from sqlalchemy import event, func
 from sqlalchemy.orm import attributes
 from geoalchemy2.shape import to_shape
 from sqlalchemy import event
+from sqlalchemy.dialects.postgresql import JSON
 
 class Base(DeclarativeBase):
     pass
@@ -72,8 +73,13 @@ class GPXTrack(Base):
     __allow_unmapped__ = True
     id = Column(Integer, primary_key=True)
     elevation_gain = Column(Integer)
+    elevation_loss = Column(Integer)
+    length = Column(Integer)
     name = Column(String)
     type = Column(String)
+    start_point_geo = Column(JSON, nullable=False, default=dict)
+
+
     owner = Column(Integer, nullable=False)
     geom = Column(Geometry(geometry_type='LINESTRING', srid=4326))
     insert_date: Column[datetime] = Column(DateTime, server_default=func.now(), onupdate=func.now())

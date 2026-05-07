@@ -25,7 +25,8 @@ def calculate_elevation_gain(gpx):
     
     # 4. Filter for positive gains and sum them
     elevation_gain = df[df['elevation_diff'] > 0]['elevation_diff'].sum()
+    elevation_loss = df[df['elevation_diff'] < 0]['elevation_diff'].sum()
     
-    return float(elevation_gain)
+    return float(elevation_gain), float(elevation_loss)
 
 # Load data

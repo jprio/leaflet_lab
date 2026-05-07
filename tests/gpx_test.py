@@ -1,38 +1,41 @@
 import gpxpy
 import gpxpy.gpx
 import pandas as pd
+import sys
+import os
+sys.path.append(os.path.join('..', 'src'))
+from app.utils.gpxutils import calculate_elevation_gain
+# def calculate_elevation_gain(gpx_file_path):
+#     # 1. Parse the GPX file
+#     with open(gpx_file_path, 'r') as f:
+#         gpx = gpxpy.parse(f)
+    
+#     # 2. Extract points into a DataFrame
+#     points = []
+#     for track in gpx.tracks:
+#         for segment in track.segments:
+#             for point in segment.points:
+#                 points.append({
+#                     'time': point.time,
+#                     'latitude': point.latitude,
+#                     'longitude': point.longitude,
+#                     'elevation': point.elevation
+#                 })
+    
+#     df = pd.DataFrame.from_records(points)
+    
+#     # Ensure elevation is numeric and handle NaNs
+#     df['elevation'] = pd.to_numeric(df['elevation'], errors='coerce').ffill()
+    
+#     # 3. Calculate elevation difference between consecutive points
+#     df['elevation_diff'] = df['elevation'].diff()
+    
+#     # 4. Filter for positive gains and sum them
+#     elevation_gain = df[df['elevation_diff'] > 0]['elevation_diff'].sum()
+    
+#     return elevation_gain
 
-def calculate_elevation_gain(gpx_file_path):
-    # 1. Parse the GPX file
-    with open(gpx_file_path, 'r') as f:
-        gpx = gpxpy.parse(f)
-    
-    # 2. Extract points into a DataFrame
-    points = []
-    for track in gpx.tracks:
-        for segment in track.segments:
-            for point in segment.points:
-                points.append({
-                    'time': point.time,
-                    'latitude': point.latitude,
-                    'longitude': point.longitude,
-                    'elevation': point.elevation
-                })
-    
-    df = pd.DataFrame.from_records(points)
-    
-    # Ensure elevation is numeric and handle NaNs
-    df['elevation'] = pd.to_numeric(df['elevation'], errors='coerce').ffill()
-    
-    # 3. Calculate elevation difference between consecutive points
-    df['elevation_diff'] = df['elevation'].diff()
-    
-    # 4. Filter for positive gains and sum them
-    elevation_gain = df[df['elevation_diff'] > 0]['elevation_diff'].sum()
-    
-    return elevation_gain
-
-gpx_file = open('tests/gpx/fells_loop.gpx', 'r')
+gpx_file = open('tests/gpx/kolsu-naryn.gpx', 'r')
 
 gpx = gpxpy.parse(gpx_file)
 for track in gpx.tracks:
@@ -56,6 +59,7 @@ for waypoint in gpx.waypoints:
 for route in gpx.routes:
     print ('Route:')
 
-elevation_gain = calculate_elevation_gain('tests/gpx/kolsu-naryn.gpx')   
+elevation_gain, elevation_loss = calculate_elevation_gain(gpx)   
 print("elevation gain : {0:.2f} meters".format(float(elevation_gain)))
+print("elevation loss : {0:.2f} meters".format(float(elevation_loss)))
 print("elevation gain type : " + str(type(elevation_gain)))

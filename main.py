@@ -1,24 +1,18 @@
-from flask import Flask, render_template,make_response, redirect, render_template_string, request, session,g, flash, url_for
+from flask import Flask, render_template,make_response, redirect, request, session,g, flash, url_for, Blueprint
 from flask_cors import CORS, cross_origin
 from flask_leaflet import Leaflet
 from flask_leaflet import Map
 import folium
+from folium import Element
+
 import requests
 import json
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
-from google_auth_oauthlib.flow import InstalledAppFlow
-from  oauthlib import oauth2
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_login import LoginManager
 from dotenv import load_dotenv
 import os
-import psycopg_pool
 from werkzeug.utils import secure_filename
 import gpxpy
 import pandas as pd
-from folium.map import Marker
-from jinja2 import Template
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from geoalchemy2 import Geometry, WKTElement
@@ -26,123 +20,123 @@ from shapely.geometry import LineString
 from app.models.domain import Base, User, Collection, Trail, GPXTrack
 import  app.models .persistence as persistence
 import geopandas as gpd
-import geojson
 from geoalchemy2.shape import to_shape
 from sqlalchemy import select, func
 from app.utils.gpxutils import calculate_elevation_gain
+from flask_sqlalchemy import SQLAlchemy
+import geocoder
 
 ALLOWED_EXTENSIONS = {'gpx', 'tcx', 'fit', 'csv'}
 
-DATA = {
-        'response_type':"code", # this tells the auth server that we are invoking authorization workflow
-        # 'redirect_uri':"https://laughing-umbrella-p75jgv4prf75v9-5000.app.github.dev/alltrail", # redirect URI https://console.developers.google.com/apis/credentials
-        'redirect_uri':os.environ['GOOGLE_REDIRECT_URI'],
-        'scope': 'https://www.googleapis.com/auth/userinfo.email', # resource we are trying to access through Google API
-        'client_id':os.environ['GOOGLE_CLIENT_ID'], # client ID from https://console.developers.google.com/apis/credentials
-        'prompt':'consent'} # adds a consent screen
- 
-URL_DICT = {
-        'google_oauth' : 'https://accounts.google.com/o/oauth2/v2/auth', # Google OAuth URI
-        'token_gen' : 'https://oauth2.googleapis.com/token', # URI to generate token to access Google API
-        'get_user_info' : 'https://www.googleapis.com/oauth2/v3/userinfo' # URI to get the user info
-        }
- 
-# Create a Sign in URI
-CLIENT = oauth2.WebApplicationClient(os.environ['GOOGLE_CLIENT_ID'])
-REQ_URI = CLIENT.prepare_request_uri(
-    uri=URL_DICT['google_oauth'],
-    redirect_uri=DATA['redirect_uri'],
-    scope=DATA['scope'],
-    prompt=DATA['prompt'])
-
-from flask_sqlalchemy import SQLAlchemy
-
-
-app = Flask(__name__, static_url_path='', 
-            static_folder='static')
-CORS(app) 
-
-leaflet = Leaflet()
-leaflet.init_app(app)
-
-
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
-app.secret_key="123"
-app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require'
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
-    'max_overflow': 20,
-    'pool_timeout': 30
-}
-
 db = SQLAlchemy(model_class=Base)
-db.init_app(app)
 
-@app.route('/login')
-def login():
-    "Home"
-    return redirect(REQ_URI)
+def create_app():
+    import app.models as models, app.routes as routes
+
+    app = Flask(__name__, static_url_path='', 
+            static_folder='static')
+    CORS(app) 
+
+    leaflet = Leaflet()
+    leaflet.init_app(app)
+    models.init_app(app)
+    routes.init_app(app)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
+    app.secret_key="123"
+    app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require'
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_size': 10,
+        'max_overflow': 20,
+        'pool_timeout': 30
+    }
+    from app.routes import auth
+    app.register_blueprint(auth.bp)
+    print(app.url_map)
+    db.init_app(app)
+    return app
+
+app = create_app()
 
 @app.route('/alltrail')
 def alltrail():
-    # session.pop('user',None)
-    # redirect to the newly created Sign-In URI
+    colors={
+            'HIKE': 'green',
+            'OFFROAD': 'blue',
+            'hiking': 'brown',
+            'skiing': 'cyan',
+            'other': 'red'}
 
-    session = db.session
-    locations = session.query(GPXTrack).all()
-    
-    query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks;"
-    df_mean = pd.read_sql(query, session.connection())
-    m = folium.Map(location=[df_mean['mean_latitude'].iloc[0], df_mean['mean_longitude'].iloc[0]], zoom_start=10, tiles='OpenStreetMap')
-    track_list=[]
-    for gpx_track in locations:
-        geom = gpx_track.geom
-        name = gpx_track.name
-        shapely_geom = to_shape(geom)
-        geojson_str = geojson.dumps(shapely_geom)
-
-        track_list.append(gpx_track)
-        tooltip = name + '<br>'     \
-         + f"Length: {gpx_track.length:.2f} km" + ' <br>'       \
-                  + f"Elevation gain: {gpx_track.elevation_gain} m"  + ' <br> '       + f"Type: {gpx_track.type}"
-         
-        on_click_script = folium.JsCode("""
+    def style_function(feature):
+        type = feature['properties']['type']
+    # print(type)
+        return {
+            # 'fillColor': "#b92c2c",
+            "color": colors.get(type),
+            'fillOpacity': 0.5,
+            #borders
+            'weight': 3,
+        }
+    def highlight_function(feature):
+        type = feature['properties']['type']
+    # print(type)
+        return {
+            'fillColor': '#ffff00',
+            "color": "yellow",
+            'fillOpacity': 1,
+            #borders
+            'weight': 5,
+        }
+    tooltip = folium.GeoJsonTooltip(
+        fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo"],
+        # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
+        localize=True,
+        sticky=False,
+        labels=True,
+        style="""
+            background-color: #F0EFEF;
+            border: 2px solid black;
+            border-radius: 3px;
+            box-shadow: 3px;
+        """,
+        max_width=800,
+    )
+    on_click_script = folium.JsCode("""
         function(feature, layer) {
             layer.on('click', function(e) {
-                console.log(window.parent.controlElevation);
                 if (window.parent.controlElevation) {
                     window.parent.controlElevation.clear();
                     // Charger les données d'élévation pour ce track
                     var gjl = L.geoJson(layer.toGeoJSON(),{
-		                onEachFeature: window.parent.controlElevation.addData.bind(window.parent.controlElevation)
-		            });
+                        onEachFeature: window.parent.controlElevation.addData(feature)
+                        // onEachFeature: window.parent.controlElevation.addData.bind(window.parent.controlElevation)
+                    });
                 }                                                               
             });
         }
         """)
-        if "HIKE" in str(gpx_track.type):
-            color = 'green'
-        elif str(gpx_track.type) == "running":
-            color = 'blue'
-        elif "OFFROAD" in str(gpx_track.type):
-            color = 'red'
-        else:
-            color = 'gray'
-        gj=folium.GeoJson(geojson_str, tooltip=folium.Tooltip(text=tooltip), color=color, on_each_feature=on_click_script, )
+
+    session = db.session
+    with session.connection() as conn:
+        gdf_tracks = gpd.GeoDataFrame.from_postgis("SELECT * FROM gpx_tracks", con=session.connection())
+        
+        query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks;"
+        df_mean = pd.read_sql(query, session.connection())
+        m = folium.Map( location=[df_mean['mean_latitude'].iloc[0], df_mean['mean_longitude'].iloc[0]], zoom_start=8, tiles='OpenStreetMap')
+        m._name = "ma_carte"
+        m._id = "unique123"
+        m.get_root().height = "600px"
+        gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        gj=folium.GeoJson(gdf_tracks.to_json(), 
+                          style_function=style_function,
+                          highlight_function=highlight_function,
+                          start_stop_colors=("green", "red"),
+                          tooltip=tooltip, 
+                          on_each_feature=on_click_script,
+                          zoom_on_click=True)
         gj.add_to(m)
-    
-    # Passer les données GeoJSON au template
-    # engine.dispose()
-    m.get_root().width = "100%"
-    m.get_root().height = "600px"
+    session.close()
+    return render_template('trails.html', script_map=m.get_root()._repr_html_(), track_list=gdf_tracks.to_dict('records'))
 
-    return render_template('trails.html', script_map=m.get_root()._repr_html_(), track_list=track_list)
-
-@app.route('/user/<email>')
-def login_success(email):
-    "Landing page after successful login"
- 
-    return "Hello %s" % email
 
 @app.route('/home')
 def home():
@@ -182,9 +176,6 @@ def home():
     print(session['user'])
     return redirect('/')
 
-@app.route("/data")
-def data():
-    return {"message": "Success"}
 
 @app.route("/")
 def map():
@@ -254,11 +245,6 @@ def elevation():
     collection = geojson.FeatureCollection([feature])
     return render_template('elevation.html', geojson=collection)
 
-@app.route('/logout')
-def logout():
-    session.pop('user',None)
-    # redirect to the newly created Sign-In URI
-    return redirect("/alltrail")
 
 @app.route('/upload', methods = ['POST'])
 def upload_file():
@@ -285,6 +271,8 @@ def upload_file():
         gpx = gpxpy.parse(file)
         for track in gpx.tracks:
             print(track.name)
+
+            
             # Calculate 3D distance in meters
             distance_3d = track.length_3d()
             print(f"Track: {track.name}, Distance: {distance_3d:.2f} meters")
@@ -293,12 +281,25 @@ def upload_file():
             distance_2d = track.length_2d()
             print(f"Track: {track.name}, 2D Distance: {distance_2d:.2f} meters")
             # elevation gain
-            elevation_gain = calculate_elevation_gain(gpx)
+            elevation_gain, elevation_loss = calculate_elevation_gain(gpx)
             print(f"Track: {track.name}, Elevation Gain: {elevation_gain:.2f} meters")
+            # Access the first point of the first track
+            start_point = None
+            if track.segments:
+                first_segment = track.segments[0]
+                if first_segment.points:
+                    start_point = first_segment.points[0]
+                    print(f"Start Latitude: {start_point.latitude}")
+                    print(f"Start Longitude: {start_point.longitude}")
+                    print(f"Start Elevation: {start_point.elevation}")
+                    for segment in track.segments:
+                        point= segment.points[0]
+                        print ('Start at ({0},{1}) -> {2}'.format(point.latitude, point.longitude, point.elevation))
 
-            for segment in track.segments:
-                point= segment.points[0]
-                print ('Start at ({0},{1}) -> {2}'.format(point.latitude, point.longitude, point.elevation))
+            g = geocoder.google([start_point.latitude, start_point.longitude], method='reverse', key="AIzaSyArCKGOcBrg3Scbd3ufSF9511wsn1-_uVo")
+            print(g.json)
+            # print( g.country_long +">" + g.state_long + ">" + g.county + ">" + g.city)
+            start_point_geo={'country': g.country_long, 'state': g.state_long, 'county': g.county, 'city': g.city}
 
             points = [(point.longitude, point.latitude, point.elevation) for segment in track.segments for point in segment.points]
             line_string = LineString(points)
@@ -306,7 +307,14 @@ def upload_file():
             # Convert to WKT for insertion
             wkt = line_string.wkt
             try:
-                new_track = GPXTrack(name=track.name, geom=WKTElement(wkt, srid=4326), owner=owner, type=type, elevation_gain=elevation_gain, insert_date=func.now())
+                new_track = GPXTrack(name=track.name, geom=WKTElement(wkt, srid=4326)
+                                     , owner=owner
+                                     , type=type
+                                     , elevation_gain=elevation_gain
+                                     , elevation_loss=elevation_loss
+                                     , insert_date=func.now()
+                                     , length=track.length_3d()
+                                     , start_point_geo=start_point_geo)
                 sess.add(new_track)
                 print(f"Inserted track: {track.name} with {len(points)} points.")
                 sess.commit()    
