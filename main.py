@@ -4,7 +4,7 @@ from flask_leaflet import Leaflet
 from flask_leaflet import Map
 import folium
 from folium import Element
-
+from datetime import timedelta, datetime
 import requests
 import json
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -51,7 +51,6 @@ def create_app():
     }
     from app.routes import auth
     app.register_blueprint(auth.bp)
-    print(app.url_map)
     db.init_app(app)
     return app
 
@@ -86,20 +85,6 @@ def alltrail():
             #borders
             'weight': 5,
         }
-    tooltip = folium.GeoJsonTooltip(
-        fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo"],
-        # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
-        localize=True,
-        sticky=False,
-        labels=True,
-        style="""
-            background-color: #F0EFEF;
-            border: 2px solid black;
-            border-radius: 3px;
-            box-shadow: 3px;
-        """,
-        max_width=800,
-    )
     on_click_script = folium.JsCode("""
         function(feature, layer) {
             layer.on('click', function(e) {
@@ -117,64 +102,79 @@ def alltrail():
 
     session = db.session
     with session.connection() as conn:
-        gdf_tracks = gpd.GeoDataFrame.from_postgis("SELECT * FROM gpx_tracks", con=session.connection())
+        gdf_tracks = gpd.GeoDataFrame.from_postgis("SELECT * FROM gpx_tracks", con=conn)
         
         query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks;"
-        df_mean = pd.read_sql(query, session.connection())
+        df_mean = pd.read_sql(query, conn)
         m = folium.Map( location=[df_mean['mean_latitude'].iloc[0], df_mean['mean_longitude'].iloc[0]], zoom_start=8, tiles='OpenStreetMap')
+
+        folium.TileLayer(tiles='https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+                          attr='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+                          name="opentopomap",
+                        overlay=False).add_to(m)
+        folium.TileLayer('Cartodb Positron').add_to(m)
+        folium.TileLayer( tiles="https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+            attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/" target="_blank">Humanitarian OpenStreetMap Team</a> hosted by <a href="https://openstreetmap.fr/" target="_blank">OpenStreetMap France</a>',
+            name="OSM Hot",
+            overlay=False).add_to(m)
+        
         m._name = "ma_carte"
         m._id = "unique123"
         m.get_root().height = "600px"
         gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        gj=folium.GeoJson(gdf_tracks.to_json(), 
-                          style_function=style_function,
-                          highlight_function=highlight_function,
-                          start_stop_colors=("green", "red"),
-                          tooltip=tooltip, 
-                          on_each_feature=on_click_script,
-                          zoom_on_click=True)
-        gj.add_to(m)
+        gdf_tracks['duration'] = 0
+        try:
+            gdf_tracks['duration'] = (gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+            gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as e: 
+            print(f"Error formatting start_time or end_time: {e}")
+        gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
+        gdf_tracks['link'] = gdf_tracks['link'].fillna('')
+        for type in gdf_tracks['type'].unique(): 
+            tooltip = folium.GeoJsonTooltip(
+                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration"],
+                # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
+                localize=True,
+                sticky=False,
+                labels=True,
+                style="""
+                    background-color: #F0EFEF;
+                    border: 2px solid black;
+                    border-radius: 3px;
+                    box-shadow: 3px;
+                """,
+                max_width=800,
+            )
+            popup = folium.GeoJsonPopup(
+                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration"],
+                # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
+                localize=True,
+                sticky=False,
+                labels=True,
+                style="""
+                    background-color: #F0EFEF;
+                    border: 2px solid black;
+                    border-radius: 3px;
+                    box-shadow: 3px;
+                """,
+                max_width=800,
+            )
+
+            gj=folium.GeoJson(gdf_tracks[(gdf_tracks['type'] == type)].to_json(), 
+                            style_function=style_function,
+                            highlight_function=highlight_function,
+                            tooltip=tooltip, 
+                            popup=popup,
+                            name=type,
+                            on_each_feature=on_click_script,
+                            zoom_on_click=True)
+            gj.add_to(m)
+        folium.LayerControl().add_to(m)
+
     session.close()
     return render_template('trails.html', script_map=m.get_root()._repr_html_(), track_list=gdf_tracks.to_dict('records'))
 
-
-@app.route('/home')
-def home():
-
-    "Redirect after Google login & consent"
- 
-    # Get the code after authenticating from the URL
-    code = request.args.get('code')
- 
-    # Generate URL to generate token
-    token_url, headers, body = CLIENT.prepare_token_request(
-            URL_DICT['token_gen'],
-            authorisation_response=request.url,
-            redirect_url=request.base_url,
-            code=code)
- 
-    # Generate token to access Google API
-    token_response = requests.post(
-            token_url,
-            headers=headers,
-            data=body,
-            auth=(os.environ['GOOGLE_CLIENT_ID'], os.environ['GOOGLE_CLIENT_SECRET']))
-    print(token_response.content)
-
-    # Parse the token response
-    CLIENT.parse_request_body_response(json.dumps(token_response.json()))
- 
-    # Add token to the  Google endpoint to get the user info
-    # oauthlib uses the token parsed in the previous step
-    uri, headers, body = CLIENT.add_token(URL_DICT['get_user_info'])
- 
-    # Get the user info
-    response_user_info = requests.get(uri, headers=headers, data=body)
-    info = response_user_info.json()
-    session['user']=info
-    session.permanent = True
-    print(session['user'])
-    return redirect('/')
 
 
 @app.route("/")
@@ -271,8 +271,8 @@ def upload_file():
         gpx = gpxpy.parse(file)
         for track in gpx.tracks:
             print(track.name)
-
-            
+            start_time, end_time = gpx.get_time_bounds()
+            link=gpx.link
             # Calculate 3D distance in meters
             distance_3d = track.length_3d()
             print(f"Track: {track.name}, Distance: {distance_3d:.2f} meters")
@@ -312,6 +312,9 @@ def upload_file():
                                      , type=type
                                      , elevation_gain=elevation_gain
                                      , elevation_loss=elevation_loss
+                                     , link=link
+                                     , start_time=start_time
+                                     , end_time=end_time
                                      , insert_date=func.now()
                                      , length=track.length_3d()
                                      , start_point_geo=start_point_geo)

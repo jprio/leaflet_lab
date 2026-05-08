@@ -5,37 +5,10 @@ import sys
 import os
 sys.path.append(os.path.join('..', 'src'))
 from app.utils.gpxutils import calculate_elevation_gain
-# def calculate_elevation_gain(gpx_file_path):
-#     # 1. Parse the GPX file
-#     with open(gpx_file_path, 'r') as f:
-#         gpx = gpxpy.parse(f)
-    
-#     # 2. Extract points into a DataFrame
-#     points = []
-#     for track in gpx.tracks:
-#         for segment in track.segments:
-#             for point in segment.points:
-#                 points.append({
-#                     'time': point.time,
-#                     'latitude': point.latitude,
-#                     'longitude': point.longitude,
-#                     'elevation': point.elevation
-#                 })
-    
-#     df = pd.DataFrame.from_records(points)
-    
-#     # Ensure elevation is numeric and handle NaNs
-#     df['elevation'] = pd.to_numeric(df['elevation'], errors='coerce').ffill()
-    
-#     # 3. Calculate elevation difference between consecutive points
-#     df['elevation_diff'] = df['elevation'].diff()
-    
-#     # 4. Filter for positive gains and sum them
-#     elevation_gain = df[df['elevation_diff'] > 0]['elevation_diff'].sum()
-    
-#     return elevation_gain
 
-gpx_file = open('tests/gpx/kolsu-naryn.gpx', 'r')
+# gpx_file = open('tests/gpx/kol-suu-naryn-kyrgyzstan.gpx', 'r')
+# gpx_file = open('tests/gpx/kolsu-naryn.gpx', 'r')
+gpx_file = open('tests/gpx/red-hills-canyon.gpx', 'r')
 
 gpx = gpxpy.parse(gpx_file)
 for track in gpx.tracks:
@@ -48,7 +21,13 @@ for track in gpx.tracks:
     distance_2d = track.length_2d()
     print(f"Track: {track.name}, 2D Distance: {distance_2d:.2f} meters")
     # elevation gain
-    
+    link=gpx.link
+    print(f"Track: {track.name}, Link : {link}")
+    duration = track.get_duration()
+    print(f"Track: {track.name}, Duration: {duration} seconds")
+    file_start_time, file_end_time = gpx.get_time_bounds()
+    print(f"Track: {track.name}, Start Time: {file_start_time}, End Time: {file_end_time}")
+
     for segment in track.segments:
         point= segment.points[0]
         print ('Start at ({0},{1}) -> {2}'.format(point.latitude, point.longitude, point.elevation))

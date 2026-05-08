@@ -49,3 +49,41 @@ def logout():
 #         return view(**kwargs)
 
 #     return wrapped_view
+
+@bp.route('/home')
+def home():
+
+    "Redirect after Google login & consent"
+ 
+    # Get the code after authenticating from the URL
+    code = request.args.get('code')
+ 
+    # Generate URL to generate token
+    token_url, headers, body = CLIENT.prepare_token_request(
+            URL_DICT['token_gen'],
+            authorisation_response=request.url,
+            redirect_url=request.base_url,
+            code=code)
+ 
+    # Generate token to access Google API
+    token_response = requests.post(
+            token_url,
+            headers=headers,
+            data=body,
+            auth=(os.environ['GOOGLE_CLIENT_ID'], os.environ['GOOGLE_CLIENT_SECRET']))
+    print(token_response.content)
+
+    # Parse the token response
+    CLIENT.parse_request_body_response(json.dumps(token_response.json()))
+ 
+    # Add token to the  Google endpoint to get the user info
+    # oauthlib uses the token parsed in the previous step
+    uri, headers, body = CLIENT.add_token(URL_DICT['get_user_info'])
+ 
+    # Get the user info
+    response_user_info = requests.get(uri, headers=headers, data=body)
+    info = response_user_info.json()
+    session['user']=info
+    session.permanent = True
+    print(session['user'])
+    return redirect('/')

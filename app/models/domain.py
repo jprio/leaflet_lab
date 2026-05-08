@@ -78,11 +78,13 @@ class GPXTrack(Base):
     name = Column(String)
     type = Column(String)
     start_point_geo = Column(JSON, nullable=False, default=dict)
-
-
+    link = Column(String)
     owner = Column(Integer, nullable=False)
     geom = Column(Geometry(geometry_type='LINESTRING', srid=4326))
     insert_date: Column[datetime] = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    start_time: Column[datetime] = Column(DateTime)
+    end_time: Column[datetime] = Column(DateTime)
+
     # length: int
     def __repr__(self) -> str:
         return f"GPXTrack(id={self.id!r}, name={self.name!r})"
