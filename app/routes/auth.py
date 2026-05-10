@@ -98,7 +98,7 @@ def home():
     user.uuid = info['sub']
     user.email = info['email']
     user_db = db.session.query(User).filter_by(
-        name="Jean-Pierre Rio").first()
+        name=user.name).first()
     if user_db is None:  # register the user if not already in the database
         db.session.add(user)
         db.session.commit()
