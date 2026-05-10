@@ -18,8 +18,13 @@ from geoalchemy2.shape import to_shape
 from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import JSON
 
+
 class Base(DeclarativeBase):
     pass
+
+    def __int__(self):
+        pass
+
 
 class User(Base):
     __tablename__ = "user_account"
@@ -29,22 +34,25 @@ class User(Base):
     fullname: Mapped[Optional[str]]
     collections: Mapped[List["Collection"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
-    ) 
+    )
+
     def __repr__(self) -> str:
         return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
-    
+
+
 class Collection(Base):
     __tablename__ = "collection"
     # id: Mapped[int] = mapped_column(primary_key=True, )
     id = Column(Integer, Identity(start=1), primary_key=True)
-    
+
     name: Mapped[str]
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
     user: Mapped["User"] = relationship(back_populates="collections")
 
     def __repr__(self) -> str:
         return f"Collection(id={self.id!r}, name={self.name!r})"
-    
+
+
 class Trail(Base):
     __tablename__ = "trail"
     # id: Mapped[int] = mapped_column(primary_key=True, )
@@ -60,13 +68,16 @@ class Trail(Base):
     ranking: Mapped[float]
     # tags: Mapped[List[str]]
     description: Mapped[str]
+
     def __repr__(self) -> str:
         return f"Trail(id={self.id!r}, name={self.name!r})"
-    
+
+
 class Track(Base):
     __tablename__ = 'tracks'
     id = Column(Integer, primary_key=True)
     geom = Column(Geometry('POINT', srid=4326))
+
 
 class GPXTrack(Base):
     __tablename__ = 'gpx_tracks'
@@ -82,7 +93,8 @@ class GPXTrack(Base):
     link = Column(String)
     owner = Column(Integer, nullable=False)
     geom = Column(Geometry(geometry_type='LINESTRING', srid=4326))
-    insert_date: Column[datetime] = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    insert_date: Column[datetime] = Column(
+        DateTime, server_default=func.now(), onupdate=func.now())
     start_time: Column[datetime] = Column(DateTime)
     end_time: Column[datetime] = Column(DateTime)
 
@@ -94,9 +106,11 @@ class GPXTrack(Base):
 # def gpxtrack_before_commit(session, instance):
 #     print(instance)
 
+
 @event.listens_for(GPXTrack, "before_insert")
 def receive_before_insert(mapper, connection, target):
     print("Before inserting GPXTrack:", target)
+
 
 @event.listens_for(GPXTrack, "load")
 def load_b(track, context):
