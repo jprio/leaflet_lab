@@ -100,8 +100,7 @@
             <div class="collection-card" data-collection-id="{{ collection.id }}"
                 onclick="window.location.href='/collection/{{ collection.id }}'">
                 <div class="collection-image">
-                    <img src="https://via.placeholder.com/300x200/{{ ['1a9f48', 'ff6b35', '147a3a', '6b7280'][loop.index0 % 4] }}/ffffff?text={{ collection.name|urlencode }}"
-                        alt="{{ collection.name }}">
+                    <img src="{{ collection.pic_url}}" alt="{{ collection.name }}">
                 </div>
                 <div class="collection-content">
                     <div class="collection-header">
@@ -211,11 +210,10 @@
         card.dataset.collectionId = collection.id;
 
         const imageColor = ['1a9f48', 'ff6b35', '147a3a', '6b7280'][Math.floor(Math.random() * 4)];
-        const imageUrl = `https://via.placeholder.com/300x200/${imageColor}/ffffff?text=${encodeURIComponent(collection.name)}`;
 
         card.innerHTML = `
             <div class="collection-image">
-                <img src="${imageUrl}" alt="${collection.name}">
+                <img src="${collection.pic_url}" alt="${collection.name}">
             </div>
             <div class="collection-content">
                 <div class="collection-header">

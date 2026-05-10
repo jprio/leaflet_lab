@@ -416,12 +416,15 @@ def create_collection():
                         ['email'], uuid=session['user']['sub'])
             user_session.add(user)
             user_session.commit()
+        pic_url = requests.get(
+            f"https://api.unsplash.com/photos/random/?query={data['name']}&client_id=Y1Ri-AxBBUpySRvlADwGX-CTWCY9yZv0mJ3peT2_2VE").json()
 
         # Create new collection
         new_collection = Collection(
             name=data['name'],
             user_id=user.id,
-            description=data.get('description', '')
+            description=data.get('description', ''),
+            pic_url=pic_url["urls"]["small_s3"]
         )
 
         user_session.add(new_collection)

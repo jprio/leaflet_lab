@@ -56,6 +56,7 @@ class Collection(Base):
     id = Column(Integer, Identity(start=1), primary_key=True)
     name: Mapped[str]
     description: Mapped[str]
+    pic_url: Mapped[Optional[str]]
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
     user: Mapped["User"] = relationship("User", back_populates="collections")
     tracks: Mapped[List["GPXTrack"]] = relationship(
