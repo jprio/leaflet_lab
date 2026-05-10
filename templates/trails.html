@@ -90,6 +90,9 @@
             <p>📍 description</p>
             <p>distance : {{track.length}}</p>
             <p>type : {{track.type}}</p>
+            <button class="btn-secondary add-to-collection-btn"
+                onclick="event.stopPropagation(); openAddToCollectionModal({{ track.id }}, '{{ track.name|replace("'", "\\'") }}');">Ajouter
+                à une collection</button>
         </div>
         {% endfor %}
     </div>
@@ -110,5 +113,93 @@
 
     </div>
 </main>
+
+<div id="addToCollectionModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Ajouter un trail à une collection</h3>
+            <span class="close" onclick="closeAddToCollectionModal()">&times;</span>
+        </div>
+        <form id="addToCollectionForm" onsubmit="submitAddToCollection(event)">
+            <div class="form-group">
+                <label for="selectedTrailName">Trail</label>
+                <input type="text" id="selectedTrailName" disabled>
+            </div>
+            <div class="form-group">
+                <label for="collectionSelect">Collection</label>
+                <select id="collectionSelect" name="collection_id" required>
+                    <option value="">Sélectionner une collection</option>
+                    {% for collection in user_collections %}
+                    <option value="{{ collection.id }}">{{ collection.name }}</option>
+                    {% endfor %}
+                </select>
+                {% if not user_collections %}
+                <p class="form-help">Vous n'avez pas encore de collection. Créez-en une depuis votre profil.</p>
+                {% endif %}
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeAddToCollectionModal()">Annuler</button>
+                <button type="submit" class="btn-primary" id="confirmAddToCollectionBtn">Ajouter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let selectedTrailId = null;
+
+    function openAddToCollectionModal(trackId, trackName) {
+        selectedTrailId = trackId;
+        document.getElementById('selectedTrailName').value = trackName;
+        document.getElementById('collectionSelect').selectedIndex = 0;
+        document.getElementById('addToCollectionModal').style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeAddToCollectionModal() {
+        selectedTrailId = null;
+        document.getElementById('addToCollectionModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+        document.getElementById('addToCollectionForm').reset();
+    }
+
+    function submitAddToCollection(event) {
+        event.preventDefault();
+        const collectionId = document.getElementById('collectionSelect').value;
+        if (!selectedTrailId || !collectionId) {
+            alert('Veuillez sélectionner une collection.');
+            return;
+        }
+
+        fetch(`/api/collections/${collectionId}/tracks`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ track_id: selectedTrailId })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.error || 'Erreur'); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('Trail ajouté à la collection avec succès !');
+                closeAddToCollectionModal();
+            })
+            .catch(error => {
+                console.error('Error adding track to collection:', error);
+                alert('Impossible d\'ajouter le trail à la collection.');
+            });
+    }
+
+    window.onclick = function (event) {
+        const modal = document.getElementById('addToCollectionModal');
+        if (event.target == modal) {
+            closeAddToCollectionModal();
+        }
+    }
+</script>
 
 {% endblock %}

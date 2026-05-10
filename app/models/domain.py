@@ -42,6 +42,14 @@ class User(Base):
         return f"User(id={self.id!r}, name={self.name!r}, email={self.email!r}, collections={self.collections!r})"
 
 
+collection_track = Table(
+    "collection_track",
+    Base.metadata,
+    Column("collection_id", ForeignKey("collection.id"), primary_key=True),
+    Column("track_id", ForeignKey("gpx_tracks.id"), primary_key=True),
+)
+
+
 class Collection(Base):
     __tablename__ = "collection"
     # id: Mapped[int] = mapped_column(primary_key=True, )
@@ -50,35 +58,14 @@ class Collection(Base):
     description: Mapped[str]
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
     user: Mapped["User"] = relationship("User", back_populates="collections")
+    tracks: Mapped[List["GPXTrack"]] = relationship(
+        "GPXTrack",
+        secondary=collection_track,
+        back_populates="collections"
+    )
 
     def __repr__(self) -> str:
         return f"Collection(id={self.id!r}, name={self.name!r})"
-
-
-class Trail(Base):
-    __tablename__ = "trail"
-    # id: Mapped[int] = mapped_column(primary_key=True, )
-    id = Column(Integer, Identity(start=1), primary_key=True)
-
-    name: Mapped[str]
-    type: Mapped[str]
-    distance: Mapped[float]
-    elevation_gain: Mapped[float]
-    start_point_latitude: Mapped[float]
-    end_point_longitude: Mapped[float]
-    duration: Mapped[float]
-    ranking: Mapped[float]
-    # tags: Mapped[List[str]]
-    description: Mapped[str]
-
-    def __repr__(self) -> str:
-        return f"Trail(id={self.id!r}, name={self.name!r})"
-
-
-class Track(Base):
-    __tablename__ = 'tracks'
-    id = Column(Integer, primary_key=True)
-    geom = Column(Geometry('POINT', srid=4326))
 
 
 class GPXTrack(Base):
@@ -99,6 +86,11 @@ class GPXTrack(Base):
         DateTime, server_default=func.now(), onupdate=func.now())
     start_time: Column[datetime] = Column(DateTime)
     end_time: Column[datetime] = Column(DateTime)
+    collections: Mapped[List["Collection"]] = relationship(
+        "Collection",
+        secondary=collection_track,
+        back_populates="tracks"
+    )
 
     # length: int
     def __repr__(self) -> str:

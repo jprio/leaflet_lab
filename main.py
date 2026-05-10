@@ -18,7 +18,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from geoalchemy2 import Geometry, WKTElement
 from shapely.geometry import LineString
-from app.models.domain import Base, User, Collection, Trail, GPXTrack
+from app.models.domain import Base, User, Collection, GPXTrack
 import app.models .persistence as persistence
 import geopandas as gpd
 from geoalchemy2.shape import to_shape
@@ -107,8 +107,8 @@ def alltrail():
         }
         """)
 
-    session = db.session
-    with session.connection() as conn:
+    db_session = db.session
+    with db_session.connection() as conn:
         gdf_tracks = gpd.GeoDataFrame.from_postgis(
             "SELECT * FROM gpx_tracks", con=conn)
 
@@ -201,8 +201,21 @@ def alltrail():
             gj.add_to(m)
         folium.LayerControl().add_to(m)
 
-    session.close()
-    return render_template('trails.html', script_map=m.get_root()._repr_html_(), track_list=gdf_tracks.to_dict('records'))
+        user_collections = []
+        if 'user' in session:
+            current_user = db.session.query(User).filter_by(
+                uuid=session['user'].get('sub')).first()
+            if current_user:
+                user_collections = current_user.collections
+
+    db_session.close()
+
+    return render_template(
+        'trails.html',
+        script_map=m.get_root()._repr_html_(),
+        track_list=gdf_tracks.to_dict('records'),
+        user_collections=user_collections
+    )
 
 
 @app.route("/")
@@ -465,6 +478,42 @@ def delete_collection(collection_id):
     except Exception as e:
         print(f"Error deleting collection: {e}")
         return jsonify({'error': 'Failed to delete collection'}), 500
+
+
+@app.route('/api/collections/<int:collection_id>/tracks', methods=['POST'])
+def add_track_to_collection(collection_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    track_id = data.get('track_id') if data else None
+    if not track_id:
+        return jsonify({'error': 'track_id is required'}), 400
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        collection = db.session.query(Collection).filter_by(
+            id=collection_id, user_id=current_user.id).first()
+        if not collection:
+            return jsonify({'error': 'Collection not found'}), 404
+
+        track = db.session.query(GPXTrack).filter_by(id=track_id).first()
+        if not track:
+            return jsonify({'error': 'Trail not found'}), 404
+
+        if track not in collection.tracks:
+            collection.tracks.append(track)
+            db.session.commit()
+
+        return jsonify({'message': 'Trail added to collection successfully'}), 201
+    except Exception as e:
+        print(f"Error adding track to collection: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': 'Failed to add trail to collection'}), 500
 
 
 if __name__ == "__main__":

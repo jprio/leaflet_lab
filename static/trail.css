@@ -289,6 +289,24 @@
             margin-bottom: 0.5rem;
         }
 
+        .add-to-collection-btn {
+            margin-top: 0.5rem;
+            padding: 0.5rem 0.85rem;
+            border: 2px solid #d1d5db;
+            background: var(--white);
+            color: var(--text-dark);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-to-collection-btn:hover {
+            background: var(--light-green);
+            border-color: var(--primary-green);
+            color: var(--dark-green);
+        }
+
         .difficulty {
             display: inline-block;
             padding: 0.25rem 0.5rem;
