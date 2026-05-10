@@ -5,11 +5,11 @@
     <!-- Profile Header -->
     <div class="profile-header">
         <div class="profile-avatar">
-            <img src="{{ user.picture }}" alt="{{ user.name }}" class="avatar-img">
+            <img src="{{session['user']['picture'] }}" alt="{{ session['user']['name'] }}" class="avatar-img">
         </div>
         <div class="profile-info">
-            <h1 class="profile-name">{{ user.name }}</h1>
-            <p class="profile-email">{{ user.email }}</p>
+            <h1 class="profile-name">{{ session['user']['name'] }}</h1>
+            <p class="profile-email">{{ session['user']['email'] }}</p>
             <p class="profile-bio">Passionate hiker exploring the world's trails. Always seeking the next adventure!</p>
             <div class="profile-actions">
                 <a href="/auth/logout" class="btn-secondary">Logout</a>
@@ -191,15 +191,49 @@
             })
             .then(data => {
                 console.log('Collection created:', data);
+                addCollectionCard(data);
                 alert('Collection "' + data.name + '" created successfully!');
                 closeAddCollectionModal();
-                // Optionally refresh the page or update the collections list
-                // location.reload();
             })
             .catch(error => {
                 console.error('Error:', error);
                 alert('Failed to create collection. Please try again.');
             });
+    }
+
+    function addCollectionCard(collection) {
+        const collectionsGrid = document.getElementById('collectionsGrid');
+        if (!collectionsGrid) return;
+
+        const card = document.createElement('div');
+        card.className = 'collection-card';
+        card.dataset.collectionId = collection.id;
+
+        const imageColor = ['1a9f48', 'ff6b35', '147a3a', '6b7280'][Math.floor(Math.random() * 4)];
+        const imageUrl = `https://via.placeholder.com/300x200/${imageColor}/ffffff?text=${encodeURIComponent(collection.name)}`;
+
+        card.innerHTML = `
+            <div class="collection-image">
+                <img src="${imageUrl}" alt="${collection.name}">
+            </div>
+            <div class="collection-content">
+                <div class="collection-header">
+                    <h3>${collection.name}</h3>
+                    <button class="btn-delete" onclick="deleteCollection(${collection.id}, '${collection.name.replace(/'/g, "\\'")}')" title="Delete collection">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                            <path d="M10 11v6"></path>
+                            <path d="M14 11v6"></path>
+                        </svg>
+                    </button>
+                </div>
+                <p>${collection.description || 'No description available'}</p>
+                <span class="collection-count">0 trails</span>
+            </div>
+        `;
+
+        collectionsGrid.prepend(card);
     }
 
     function deleteCollection(collectionId, collectionName) {
