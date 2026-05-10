@@ -27,6 +27,8 @@ from app.utils.gpxutils import calculate_elevation_gain
 from flask_sqlalchemy import SQLAlchemy
 import geocoder
 import traceback
+from sqlalchemy.orm import joinedload
+
 ALLOWED_EXTENSIONS = {'gpx', 'tcx', 'fit', 'csv'}
 load_dotenv()  # Charger les variables d'environnement à partir du fichier .env
 
@@ -516,6 +518,96 @@ def add_track_to_collection(collection_id):
         return jsonify({'error': 'Failed to add trail to collection'}), 500
 
 
+@app.route('/collection/<int:collection_id>')
+def view_collection(collection_id):
+    if 'user' not in session:
+        return redirect(url_for('auth.login'))
+
+    db_session = db.session
+    current_user = db.session.query(User).filter_by(
+        uuid=session['user'].get('sub')).first()
+    if not current_user:
+        return redirect(url_for('auth.login'))
+
+    collection = db.session.query(Collection).options(joinedload(Collection.tracks)).filter_by(
+        id=collection_id,
+        user_id=current_user.id
+    ).first()
+
+    if not collection:
+        return "Collection not found", 404
+
+    with db_session.connection() as conn:
+        sql = f"SELECT t.* FROM gpx_tracks t JOIN collection_track ct ON ct.track_id = t.id WHERE ct.collection_id = {collection_id}"
+        gdf_tracks = gpd.GeoDataFrame.from_postgis(
+            sql, con=conn, geom_col='geom')
+        print(gdf_tracks.head())
+        print(gdf_tracks['insert_date'].head())
+        if len(gdf_tracks) == 0:
+            m = folium.Map(location=[0, 0],
+                           zoom_start=2, tiles='OpenStreetMap')
+        else:
+            try:
+                gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
+                    '%Y-%m-%d %H:%M:%S')
+                gdf_tracks['duration'] = 0
+                gdf_tracks['duration'] = (
+                    gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+                gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+                    '%Y-%m-%d %H:%M:%S')
+                gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
+                    '%Y-%m-%d %H:%M:%S')
+            except Exception:
+                pass
+
+            gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
+            gdf_tracks['link'] = gdf_tracks['link'].fillna('')
+            gdf_tracks['comment'].str.replace('\r\n', '<br>')
+
+            query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks t JOIN collection_track ct ON ct.track_id = t.id WHERE ct.collection_id = %s;"
+            df_mean = pd.read_sql(query, conn, params=(collection_id,))
+            m = folium.Map(location=[df_mean['mean_latitude'].iloc[0],
+                           df_mean['mean_longitude'].iloc[0]], zoom_start=8, tiles='OpenStreetMap')
+
+            folium.TileLayer(tiles='https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+                             attr='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                             name='OpenTopoMap',
+                             overlay=False).add_to(m)
+            folium.TileLayer('Cartodb Positron').add_to(m)
+            folium.TileLayer(tiles='https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+                             attr='&copy; OpenStreetMap contributors',
+                             name='OSM Hot',
+                             overlay=False).add_to(m)
+            folium.TileLayer(tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                             attr='Google Maps (Route)',
+                             name='Google Maps (Route)',
+                             overlay=False).add_to(m)
+            folium.TileLayer(tiles='https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+                             attr='Google Terrain',
+                             name='Google Terrain',
+                             overlay=False).add_to(m)
+            folium.TileLayer(tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+                             attr='Google Satellite',
+                             name='Google Satellite',
+                             overlay=False).add_to(m)
+
+            def style_function(feature):
+                return {
+                    'color': 'green',
+                    'weight': 4,
+                    'opacity': 0.8,
+                }
+
+            folium.GeoJson(
+                gdf_tracks.to_json(),
+                style_function=style_function,
+                name='Collection Tracks'
+            ).add_to(m)
+            folium.LayerControl().add_to(m)
+
+    db_session.close()
+    return render_template('collection.html', collection=collection, script_map=m.get_root()._repr_html_())
+
+
 if __name__ == "__main__":
-    # app.run()
     app.run(host="0.0.0.0", port=5000, debug=True)

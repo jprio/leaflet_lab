@@ -97,7 +97,8 @@
         </div>
         <div class="collections-grid" id="collectionsGrid">
             {% for collection in user.collections %}
-            <div class="collection-card" data-collection-id="{{ collection.id }}">
+            <div class="collection-card" data-collection-id="{{ collection.id }}"
+                onclick="window.location.href='/collection/{{ collection.id }}'">
                 <div class="collection-image">
                     <img src="https://via.placeholder.com/300x200/{{ ['1a9f48', 'ff6b35', '147a3a', '6b7280'][loop.index0 % 4] }}/ffffff?text={{ collection.name|urlencode }}"
                         alt="{{ collection.name }}">
@@ -106,7 +107,7 @@
                     <div class="collection-header">
                         <h3>{{ collection.name }}</h3>
                         <button class="btn-delete"
-                            onclick="deleteCollection({{ collection.id }}, '{{ collection.name }}')"
+                            onclick="event.stopPropagation(); deleteCollection({{ collection.id }}, '{{ collection.name }}')"
                             title="Delete collection">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
@@ -233,6 +234,9 @@
             </div>
         `;
 
+        card.onclick = function () {
+            window.location.href = '/collection/' + collection.id;
+        };
         collectionsGrid.prepend(card);
     }
 

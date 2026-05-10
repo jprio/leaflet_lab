@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header" style="flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <a href="/auth/me" class="btn-secondary" style="margin-bottom: 1rem; display: inline-block;">← Retour au
+                profil</a>
+            <h1 class="profile-name">{{ collection.name }}</h1>
+            <p class="profile-bio">{{ collection.description or 'Aucune description pour cette collection.' }}</p>
+        </div>
+        <div style="margin-left: auto; text-align: right;">
+            <div class="stat-card"
+                style="display: inline-flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem;">
+                <div class="stat-icon">📚</div>
+                <div class="stat-content">
+                    <div class="stat-number">{{ collection.tracks | length }}</div>
+                    <div class="stat-label">Trails dans la collection</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="map-container" style="margin: 2rem 0;">
+        {{ script_map | safe }}
+    </div>
+
+    <div class="collections-section">
+        <h2>Trails de la collection</h2>
+        <div class="collections-grid">
+            {% if collection.tracks %}
+            {% for track in collection.tracks %}
+            <div class="collection-card">
+                <div class="collection-content">
+                    <h3>{{ track.name }}</h3>
+                    <p>Type : {{ track.type or 'N/A' }}</p>
+                    <p>Distance : {{ track.length or 'N/A' }}</p>
+                    <p>{{ track.comment or 'Aucun commentaire disponible.' }}</p>
+                    <div class="collection-actions" style="margin-top: 1rem;">
+                        <a href="/alltrail" class="btn-primary">Voir sur la carte</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="activity-card" style="padding: 2rem; text-align: center;">
+                <p>Aucun trail n'a encore été ajouté à cette collection.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
