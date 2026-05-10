@@ -77,6 +77,7 @@ class GPXTrack(Base):
     length = Column(Integer)
     name = Column(String)
     type = Column(String)
+    comment = Column(String)
     start_point_geo = Column(JSON, nullable=False, default=dict)
     link = Column(String)
     owner = Column(Integer, nullable=False)

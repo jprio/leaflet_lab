@@ -14,8 +14,12 @@
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap"
         rel="stylesheet">
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='trail.css') }}">
-    </link>
+    <link rel="stylesheet" href="{{ url_for('static', filename='trail.css') }}" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/ui-lightness/jquery-ui.css" rel="stylesheet"
+        type="text/css" />
+
 </head>
 
 <body>
@@ -32,10 +36,9 @@
                 <a href="#">Explore</a>
                 <a href="#">My Trails</a>
                 <a href="#">Guides</a>
-                <div> {% if 'user' in session %}
-                    <span>Welcome, {{ session['user']['email'] }}!</span>
-                    <span><img src="{{ session['user']['picture'] }}"></span>
-                    <a href="/auth/logout">Logout</a>
+                <div align="right"> {% if 'user' in session %}
+                    <span><img src="{{ session['user']['picture'] }}" width="40" height="40"
+                            alt="{{ session['user']['email'] }}" /><br><a href="/auth/logout">Logout</a></span>
                     {% else %}
                     <a href="/auth/login">Login</a>
                     {% endif %}
@@ -47,24 +50,51 @@
     <section class="hero">
         <!-- <h2>Find Your Perfect Trail</h2> -->
         <!-- <p>Discover hiking trails, running paths, and outdoor adventures near you> -->
+        <script>
+            function openForm() {
+                document.querySelector('#myForm').style.display = "block";
+            }
+            function closeForm() {
+                document.querySelector('#myForm').style.display = "none";
+            }
+        </script>
         <div class="search-container">
-            <div>
-                <form method=post action="/upload" enctype=multipart/form-data>
+            <button onclick="openForm()" class="openButton">Nouvelle trace</button>
+            <!-- Conteneur du popup -->
+            <div id="myForm" class="form-popup">
+                <form method=post action="/upload" enctype=multipart/form-data class="form-container">
                     <label for="file">Select a file:</label><input type=file name=file></input><br>
                     <!-- <input type=text name=type_activity placeholder="Type (e.g., hiking, biking)"></input><br> -->
+                    <label for="activity_type">Activity Type:</label>
                     <select name="activity_type" id="activity_type">
                         <option value="HIKE">Hike</option>
                         <option value="OFFROAD">Off-road</option>
-                    </select>
-                    <input type=submit value=Upload></input><br>
+                    </select><br>
+                    <label for="comment">Commentaire:</label><br>
+                    <textarea rows="10" cols="50" name=comment placeholder="Add a comment"></textarea><br>
+                    <input type=submit value=Upload></input>
+                    <button type="button" class="btn cancel" onclick="closeForm()">Fermer</button>
                 </form>
             </div>
+            <script>
+                $(function () {
+                    var availableTags = ["aaaa", "bbbff", "ccceerr", "ddddd", "eeeee"];
+
+                    $(function () {
+                        $("#search-input").autocomplete({
+                            source: availableTags, // Use the availableTags array for autocomplete suggestions
+                            minLength: 2 // Trigger after 2 characters
+                        });
+                    });
+
+
+                });
+            </script>
             <div>
-                <input type="text" class="search-input" placeholder="Where do you want to go?">
+                <input type="text" id="search-input" class="search-input" placeholder="Where do you want to go?">
                 <button class="search-btn">Search</button>
             </div>
         </div>
-        <button popovertarget="my-dialog">Open dialog</button>
 
         <dialog id="my-dialog" popover>
             <p>This dialog was opened using a popovertargetaction attribute.</p>
@@ -82,6 +112,7 @@
             <button class="filter-btn">Backpacking</button>
         </div>
     </section>
+
     <script>selectTrail = function (trail) {
             // Logique pour récupérer les détails du trail sélectionné
             console.log("Trail selected: " + trail);

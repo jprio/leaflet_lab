@@ -524,6 +524,40 @@
             font-size: 0.875rem;
         }
 
+        .form-popup {
+            display: none;
+            /* Caché par défaut */
+            position: fixed;
+            top: 50%;
+            background-color: rgba(82, 184, 97, 0.8);
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px solid #f1f1f1;
+            z-index: 9;
+            padding: 20px;
+            border-radius: 5px;
+            width: 800px;
+            height: 400px;
+        }
+
+        .openButton {
+            background-color: #04AA6D;
+            color: white;
+            padding: 16px 20px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .form-container input[type=text],
+        .form-container input[type=password] {
+            width: 100%;
+            padding: 15px;
+            margin: 5px 0 22px 0;
+            border: none;
+            background: #5c2fb1;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .main-content {
@@ -537,4 +571,34 @@
             .hero h1 {
                 font-size: 1.75rem;
             }
+        }
+
+        .ui-autocomplete {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 1000;
+            display: none;
+            float: left;
+            min-width: 160px;
+            padding: 4px 0;
+            margin: 2px 0 0;
+            list-style: none;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .ui-menu-item>a {
+            display: block;
+            padding: 3px 15px;
+            color: #555555;
+            text-decoration: none;
+        }
+
+        .ui-state-hover,
+        .ui-state-active {
+            background-color: #0088cc;
+            color: #ffffff;
         }

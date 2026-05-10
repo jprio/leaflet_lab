@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import json
 load_dotenv()
 google_api_key = os.getenv('GOOGLE_API_KEY')
-# google_api_key="AIzaSyArCKGOcBrg3Scbd3ufSF9511wsn1-_uVo"
+google_api_key="AIzaSyAxZ5VHypd3L9ipvFl8tS4n9rq60FOXgZI"
 print(google_api_key)
 print(os.getenv('GOOGLE_CLIENT_ID'))
 
@@ -43,7 +43,13 @@ def test_gmaps_places():
     for place in places_result['results']:
         print(place['types'])
         print(place['name'])
+def find_city():
+    gmaps = googlemaps.Client(key=google_api_key)
+    results = gmaps.places(query="Antony", type="city")
+    for place in results['results']:
+        print(place['name'])
 
-test_geocoder()
+# test_geocoder()
 # test_google_api()
 # test_gmaps_places()
+find_city()

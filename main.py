@@ -1,4 +1,4 @@
-from flask import Flask, render_template,make_response, redirect, request, session,g, flash, url_for, Blueprint
+from flask import Flask, render_template,make_response, redirect, request, session,g, flash, url_for, Blueprint, jsonify
 from flask_cors import CORS, cross_origin
 from flask_leaflet import Leaflet
 from flask_leaflet import Map
@@ -117,7 +117,19 @@ def alltrail():
             attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/" target="_blank">Humanitarian OpenStreetMap Team</a> hosted by <a href="https://openstreetmap.fr/" target="_blank">OpenStreetMap France</a>',
             name="OSM Hot",
             overlay=False).add_to(m)
-        
+        folium.TileLayer( tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+            attr='Google Maps (Route)',
+            name="Google Maps (Route)",
+            overlay=False).add_to(m)
+        folium.TileLayer( tiles='https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+            attr='Google Terrain',
+            name="Google Terrain",
+            overlay=False).add_to(m)
+        folium.TileLayer( tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+            attr='Google Satellite',
+            name="Google Satellite",
+            overlay=False).add_to(m)
+         
         m._name = "ma_carte"
         m._id = "unique123"
         m.get_root().height = "600px"
@@ -131,9 +143,12 @@ def alltrail():
             print(f"Error formatting start_time or end_time: {e}")
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
+        gdf_tracks['comment'].str.replace('\r\n', '<br>')
+
+
         for type in gdf_tracks['type'].unique(): 
             tooltip = folium.GeoJsonTooltip(
-                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration"],
+                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration","comment"],
                 # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
                 localize=True,
                 sticky=False,
@@ -147,7 +162,7 @@ def alltrail():
                 max_width=800,
             )
             popup = folium.GeoJsonPopup(
-                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration"],
+                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration","comment"],
                 # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
                 localize=True,
                 sticky=False,
@@ -256,6 +271,7 @@ def upload_file():
         flash('No file part')
         return redirect(request.url)
     file = request.files['file']
+    comment=request.form.get('comment')
     type=request.form.get('activity_type')
     print("type : " + type)
     # If the user does not select a file, the browser submits an
@@ -296,7 +312,7 @@ def upload_file():
                         point= segment.points[0]
                         print ('Start at ({0},{1}) -> {2}'.format(point.latitude, point.longitude, point.elevation))
 
-            g = geocoder.google([start_point.latitude, start_point.longitude], method='reverse', key="AIzaSyArCKGOcBrg3Scbd3ufSF9511wsn1-_uVo")
+            g = geocoder.google([start_point.latitude, start_point.longitude], method='reverse', key=os.getenv('GOOGLE_API_KEY'))
             print(g.json)
             # print( g.country_long +">" + g.state_long + ">" + g.county + ">" + g.city)
             start_point_geo={'country': g.country_long, 'state': g.state_long, 'county': g.county, 'city': g.city}
@@ -317,6 +333,7 @@ def upload_file():
                                      , end_time=end_time
                                      , insert_date=func.now()
                                      , length=track.length_3d()
+                                     , comment=comment
                                      , start_point_geo=start_point_geo)
                 sess.add(new_track)
                 print(f"Inserted track: {track.name} with {len(points)} points.")
@@ -333,6 +350,16 @@ def upload_file():
             print ('Route:')
 
         return redirect("/alltrail")
+    
+@app.route('/search', methods=['GET'])
+def autocomplete():
+    # Retrieve the search term sent by jQuery
+    search = request.args.get('term')
+    print("search : " + search)    
+    results = ["titi","tata","toto"]
+        
+    # Return JSON response
+    return jsonify(results=results)
 
 if __name__ == "__main__":
     # app.run()
