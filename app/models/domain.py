@@ -29,25 +29,27 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "user_account"
     id: Mapped[int] = mapped_column(primary_key=True)
+    uuid: Mapped[str] = mapped_column(String(36), unique=True)
+
     # id = Column(Integer, Identity(start=1), primary_key=True)
     name: Mapped[str] = mapped_column(String(30))
-    fullname: Mapped[Optional[str]]
-    collections: Mapped[List["Collection"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
+    email: Mapped[str] = mapped_column(String(50), unique=True)
+    collections: Mapped[List["Collection"]] = relationship("Collection",
+                                                           back_populates="user", cascade="all, delete-orphan"
+                                                           )
 
     def __repr__(self) -> str:
-        return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
+        return f"User(id={self.id!r}, name={self.name!r}, email={self.email!r}, collections={self.collections!r})"
 
 
 class Collection(Base):
     __tablename__ = "collection"
     # id: Mapped[int] = mapped_column(primary_key=True, )
     id = Column(Integer, Identity(start=1), primary_key=True)
-
     name: Mapped[str]
+    description: Mapped[str]
     user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
-    user: Mapped["User"] = relationship(back_populates="collections")
+    user: Mapped["User"] = relationship("User", back_populates="collections")
 
     def __repr__(self) -> str:
         return f"Collection(id={self.id!r}, name={self.name!r})"

@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="profile-container">
+    <!-- Profile Header -->
+    <div class="profile-header">
+        <div class="profile-avatar">
+            <img src="{{ user.picture }}" alt="{{ user.name }}" class="avatar-img">
+        </div>
+        <div class="profile-info">
+            <h1 class="profile-name">{{ user.name }}</h1>
+            <p class="profile-email">{{ user.email }}</p>
+            <p class="profile-bio">Passionate hiker exploring the world's trails. Always seeking the next adventure!</p>
+            <div class="profile-actions">
+                <a href="/auth/logout" class="btn-secondary">Logout</a>
+                <a href="/alltrail" class="btn-primary">Explore Trails</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="stats-section">
+        <h2>My Statistics</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">🏔️</div>
+                <div class="stat-content">
+                    <div class="stat-number">1,247 km</div>
+                    <div class="stat-label">Total Distance</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⛰️</div>
+                <div class="stat-content">
+                    <div class="stat-number">45,320 m</div>
+                    <div class="stat-label">Elevation Gain</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🗺️</div>
+                <div class="stat-content">
+                    <div class="stat-number">89</div>
+                    <div class="stat-label">Trails Completed</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⭐</div>
+                <div class="stat-content">
+                    <div class="stat-number">156</div>
+                    <div class="stat-label">Favorite Trails</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activities -->
+    <div class="activities-section">
+        <h2>Recent Activities</h2>
+        <div class="activities-list">
+            <div class="activity-card">
+                <div class="activity-icon">🥾</div>
+                <div class="activity-content">
+                    <h3>Alpine Ridge Trail</h3>
+                    <p class="activity-meta">Hiking • 12.5 km • +1,240 m • 4 hours ago</p>
+                    <p class="activity-description">Beautiful alpine trail with stunning views of the surrounding peaks.
+                    </p>
+                </div>
+                <div class="activity-rating">★★★★☆</div>
+            </div>
+            <div class="activity-card">
+                <div class="activity-icon">🚵</div>
+                <div class="activity-content">
+                    <h3>Lake Valley Loop</h3>
+                    <p class="activity-meta">Cycling • 28.3 km • +450 m • 2 days ago</p>
+                    <p class="activity-description">Scenic cycling route around the crystal-clear mountain lake.</p>
+                </div>
+                <div class="activity-rating">★★★★★</div>
+            </div>
+            <div class="activity-card">
+                <div class="activity-icon">🏃</div>
+                <div class="activity-content">
+                    <h3>River Trail Run</h3>
+                    <p class="activity-meta">Running • 8.7 km • +180 m • 1 week ago</p>
+                    <p class="activity-description">Fast-paced trail run following the river with technical sections.
+                    </p>
+                </div>
+                <div class="activity-rating">★★★★☆</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Collections -->
+    <div class="collections-section">
+        <div class="collections-header">
+            <h2>My Collections</h2>
+            <button class="btn-primary" onclick="openAddCollectionModal()">Add Collection</button>
+        </div>
+        <div class="collections-grid" id="collectionsGrid">
+            {% for collection in user.collections %}
+            <div class="collection-card" data-collection-id="{{ collection.id }}">
+                <div class="collection-image">
+                    <img src="https://via.placeholder.com/300x200/{{ ['1a9f48', 'ff6b35', '147a3a', '6b7280'][loop.index0 % 4] }}/ffffff?text={{ collection.name|urlencode }}"
+                        alt="{{ collection.name }}">
+                </div>
+                <div class="collection-content">
+                    <div class="collection-header">
+                        <h3>{{ collection.name }}</h3>
+                        <button class="btn-delete"
+                            onclick="deleteCollection({{ collection.id }}, '{{ collection.name }}')"
+                            title="Delete collection">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M3 6h18"></path>
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2">
+                                </path>
+                                <path d="M10 11v6"></path>
+                                <path d="M14 11v6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <p>{{ collection.description or 'No description available' }}</p>
+                    <span class="collection-count">{{ collection.trails | length if collection.trails else 0 }}
+                        trails</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Add Collection Modal -->
+    <div id="addCollectionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Collection</h3>
+                <span class="close" onclick="closeAddCollectionModal()">&times;</span>
+            </div>
+            <form id="addCollectionForm" onsubmit="submitCollection(event)">
+                <div class="form-group">
+                    <label for="collectionName">Collection Name</label>
+                    <input type="text" id="collectionName" name="name" required placeholder="Enter collection name">
+                </div>
+                <div class="form-group">
+                    <label for="collectionDescription">Description</label>
+                    <textarea id="collectionDescription" name="description" rows="3"
+                        placeholder="Describe your collection"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddCollectionModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Collection</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openAddCollectionModal() {
+        document.getElementById('addCollectionModal').style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeAddCollectionModal() {
+        document.getElementById('addCollectionModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+        document.getElementById('addCollectionForm').reset();
+    }
+
+    function submitCollection(event) {
+        event.preventDefault();
+
+        const formData = new FormData(event.target);
+        const collectionData = {
+            name: formData.get('name'),
+            description: formData.get('description')
+        };
+
+        // Send POST request to create collection
+        fetch('/api/collections', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(collectionData)
+        })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error('Failed to create collection');
+                }
+            })
+            .then(data => {
+                console.log('Collection created:', data);
+                alert('Collection "' + data.name + '" created successfully!');
+                closeAddCollectionModal();
+                // Optionally refresh the page or update the collections list
+                // location.reload();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to create collection. Please try again.');
+            });
+    }
+
+    function deleteCollection(collectionId, collectionName) {
+        if (confirm(`Are you sure you want to delete the collection "${collectionName}"? This action cannot be undone.`)) {
+            fetch(`/api/collections/${collectionId}`, {
+                method: 'DELETE',
+            })
+                .then(response => {
+                    if (response.ok) {
+                        // Remove the collection card from the DOM
+                        const collectionCard = document.querySelector(`[data-collection-id="${collectionId}"]`);
+                        if (collectionCard) {
+                            collectionCard.remove();
+                        }
+                        alert('Collection deleted successfully!');
+                    } else {
+                        throw new Error('Failed to delete collection');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to delete collection. Please try again.');
+                });
+        }
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function (event) {
+        const modal = document.getElementById('addCollectionModal');
+        if (event.target == modal) {
+            closeAddCollectionModal();
+        }
+    }
+</script>
+{% endblock %}

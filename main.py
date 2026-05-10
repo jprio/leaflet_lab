@@ -1,4 +1,5 @@
-from flask import Flask, render_template,make_response, redirect, request, session,g, flash, url_for, Blueprint, jsonify
+from app.models.db import db
+from flask import Flask, render_template, make_response, redirect, request, session, g, flash, url_for, Blueprint, jsonify
 from flask_cors import CORS, cross_origin
 from flask_leaflet import Leaflet
 from flask_leaflet import Map
@@ -18,31 +19,32 @@ from sqlalchemy.orm import sessionmaker
 from geoalchemy2 import Geometry, WKTElement
 from shapely.geometry import LineString
 from app.models.domain import Base, User, Collection, Trail, GPXTrack
-import  app.models .persistence as persistence
+import app.models .persistence as persistence
 import geopandas as gpd
 from geoalchemy2.shape import to_shape
 from sqlalchemy import select, func
 from app.utils.gpxutils import calculate_elevation_gain
 from flask_sqlalchemy import SQLAlchemy
 import geocoder
-
+import traceback
 ALLOWED_EXTENSIONS = {'gpx', 'tcx', 'fit', 'csv'}
+load_dotenv()  # Charger les variables d'environnement à partir du fichier .env
 
-db = SQLAlchemy(model_class=Base)
 
 def create_app():
-    import app.models as models, app.routes as routes
+    import app.models as models
+    import app.routes as routes
 
-    app = Flask(__name__, static_url_path='', 
-            static_folder='static')
-    CORS(app) 
+    app = Flask(__name__, static_url_path='',
+                static_folder='static')
+    CORS(app)
 
     leaflet = Leaflet()
     leaflet.init_app(app)
     models.init_app(app)
     routes.init_app(app)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
-    app.secret_key="123"
+    app.secret_key = "123"
     app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require'
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_size': 10,
@@ -54,16 +56,20 @@ def create_app():
     db.init_app(app)
     return app
 
+
 app = create_app()
+with app.app_context():
+    db.create_all()
+
 
 @app.route('/alltrail')
 def alltrail():
-    colors={
-            'HIKE': 'green',
-            'OFFROAD': 'blue',
-            'hiking': 'brown',
-            'skiing': 'cyan',
-            'other': 'red'}
+    colors = {
+        'HIKE': 'green',
+        'OFFROAD': 'blue',
+        'hiking': 'brown',
+        'skiing': 'cyan',
+        'other': 'red'}
 
     def style_function(feature):
         type = feature['properties']['type']
@@ -72,9 +78,10 @@ def alltrail():
             # 'fillColor': "#b92c2c",
             "color": colors.get(type),
             'fillOpacity': 0.5,
-            #borders
+            # borders
             'weight': 3,
         }
+
     def highlight_function(feature):
         type = feature['properties']['type']
     # print(type)
@@ -82,7 +89,7 @@ def alltrail():
             'fillColor': '#ffff00',
             "color": "yellow",
             'fillOpacity': 1,
-            #borders
+            # borders
             'weight': 5,
         }
     on_click_script = folium.JsCode("""
@@ -102,53 +109,59 @@ def alltrail():
 
     session = db.session
     with session.connection() as conn:
-        gdf_tracks = gpd.GeoDataFrame.from_postgis("SELECT * FROM gpx_tracks", con=conn)
-        
+        gdf_tracks = gpd.GeoDataFrame.from_postgis(
+            "SELECT * FROM gpx_tracks", con=conn)
+
         query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks;"
         df_mean = pd.read_sql(query, conn)
-        m = folium.Map( location=[df_mean['mean_latitude'].iloc[0], df_mean['mean_longitude'].iloc[0]], zoom_start=8, tiles='OpenStreetMap')
+        m = folium.Map(location=[df_mean['mean_latitude'].iloc[0],
+                       df_mean['mean_longitude'].iloc[0]], zoom_start=8, tiles='OpenStreetMap')
 
         folium.TileLayer(tiles='https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-                          attr='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
-                          name="opentopomap",
-                        overlay=False).add_to(m)
+                         attr='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+                         name="opentopomap",
+                         overlay=False).add_to(m)
         folium.TileLayer('Cartodb Positron').add_to(m)
-        folium.TileLayer( tiles="https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-            attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/" target="_blank">Humanitarian OpenStreetMap Team</a> hosted by <a href="https://openstreetmap.fr/" target="_blank">OpenStreetMap France</a>',
-            name="OSM Hot",
-            overlay=False).add_to(m)
-        folium.TileLayer( tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-            attr='Google Maps (Route)',
-            name="Google Maps (Route)",
-            overlay=False).add_to(m)
-        folium.TileLayer( tiles='https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
-            attr='Google Terrain',
-            name="Google Terrain",
-            overlay=False).add_to(m)
-        folium.TileLayer( tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-            attr='Google Satellite',
-            name="Google Satellite",
-            overlay=False).add_to(m)
-         
+        folium.TileLayer(tiles="https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+                         attr='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/" target="_blank">Humanitarian OpenStreetMap Team</a> hosted by <a href="https://openstreetmap.fr/" target="_blank">OpenStreetMap France</a>',
+                         name="OSM Hot",
+                         overlay=False).add_to(m)
+        folium.TileLayer(tiles='https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                         attr='Google Maps (Route)',
+                         name="Google Maps (Route)",
+                         overlay=False).add_to(m)
+        folium.TileLayer(tiles='https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+                         attr='Google Terrain',
+                         name="Google Terrain",
+                         overlay=False).add_to(m)
+        folium.TileLayer(tiles='https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+                         attr='Google Satellite',
+                         name="Google Satellite",
+                         overlay=False).add_to(m)
+
         m._name = "ma_carte"
         m._id = "unique123"
         m.get_root().height = "600px"
-        gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
+            '%Y-%m-%d %H:%M:%S')
         gdf_tracks['duration'] = 0
         try:
-            gdf_tracks['duration'] = (gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
-            gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime('%Y-%m-%d %H:%M:%S')
-            gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        except Exception as e: 
+            gdf_tracks['duration'] = (
+                gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+            gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+            gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
             print(f"Error formatting start_time or end_time: {e}")
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
         gdf_tracks['comment'].str.replace('\r\n', '<br>')
 
-
-        for type in gdf_tracks['type'].unique(): 
+        for type in gdf_tracks['type'].unique():
             tooltip = folium.GeoJsonTooltip(
-                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration","comment"],
+                fields=["name", "type", "length", "elevation_gain", "elevation_loss", "insert_date",
+                        "start_point_geo", "start_time", "end_time", "link", "duration", "comment"],
                 # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
                 localize=True,
                 sticky=False,
@@ -162,7 +175,8 @@ def alltrail():
                 max_width=800,
             )
             popup = folium.GeoJsonPopup(
-                fields=["name", "type", "length","elevation_gain", "elevation_loss","insert_date", "start_point_geo","start_time","end_time","link","duration","comment"],
+                fields=["name", "type", "length", "elevation_gain", "elevation_loss", "insert_date",
+                        "start_point_geo", "start_time", "end_time", "link", "duration", "comment"],
                 # aliases=["State:", "2015 Median Income(USD):", "Median % Change:"],
                 localize=True,
                 sticky=False,
@@ -176,14 +190,14 @@ def alltrail():
                 max_width=800,
             )
 
-            gj=folium.GeoJson(gdf_tracks[(gdf_tracks['type'] == type)].to_json(), 
-                            style_function=style_function,
-                            highlight_function=highlight_function,
-                            tooltip=tooltip, 
-                            popup=popup,
-                            name=type,
-                            on_each_feature=on_click_script,
-                            zoom_on_click=True)
+            gj = folium.GeoJson(gdf_tracks[(gdf_tracks['type'] == type)].to_json(),
+                                style_function=style_function,
+                                highlight_function=highlight_function,
+                                tooltip=tooltip,
+                                popup=popup,
+                                name=type,
+                                on_each_feature=on_click_script,
+                                zoom_on_click=True)
             gj.add_to(m)
         folium.LayerControl().add_to(m)
 
@@ -191,10 +205,9 @@ def alltrail():
     return render_template('trails.html', script_map=m.get_root()._repr_html_(), track_list=gdf_tracks.to_dict('records'))
 
 
-
 @app.route("/")
 def map():
-    response=make_response(render_template("index.html"))
+    response = make_response(render_template("index.html"))
     return response
 
 
@@ -202,9 +215,10 @@ def map():
 def folium_map():
     import geopandas as gpd
     import folium
-    from geojson_length import calculate_distance, Unit 
+    from geojson_length import calculate_distance, Unit
     engine = persistence.get_engine()
-    gdf = gpd.read_postgis("SELECT name, geom FROM gpx_tracks", con=engine, geom_col='geom')
+    gdf = gpd.read_postgis(
+        "SELECT name, geom FROM gpx_tracks", con=engine, geom_col='geom')
 
     # S'assurer que le CRS est EPSG:4326
     if gdf.crs.to_string() != 'EPSG:4326':
@@ -212,7 +226,8 @@ def folium_map():
 
     # 2. Créer la carte avec Folium
     # On centre la carte sur la moyenne des coordonnées
-    m = folium.Map(location=[gdf.geometry.centroid.y.mean(), gdf.geometry.centroid.x.mean()], zoom_start=10)
+    m = folium.Map(location=[gdf.geometry.centroid.y.mean(
+    ), gdf.geometry.centroid.x.mean()], zoom_start=10)
 
     for idx, row in gdf.iterrows():
         geom = row['geom']
@@ -222,13 +237,16 @@ def folium_map():
         if geom.geom_type == 'LineString':
             # folium.PolyLine(locations=[(point.y, point.x) for point in geom.coords], color='blue', weight=5, opacity=0.7, tooltip=name).add_to(m)
             # line = Feature(geometry=geom, properties={"name": name})
-            tooltip = name + '<br>' + f"Length: {geom.length:.2f} km" + ' <br>   ' + str(calculate_distance(geom, Unit.kilometers)*100) + f"Type: {geom.geom_type}"
-            folium.GeoJson(geom, tooltip=folium.Tooltip(text=tooltip), color='red').add_to(m)
+            tooltip = name + '<br>' + f"Length: {geom.length:.2f} km" + ' <br>   ' + str(
+                calculate_distance(geom, Unit.kilometers)*100) + f"Type: {geom.geom_type}"
+            folium.GeoJson(geom, tooltip=folium.Tooltip(
+                text=tooltip), color='red').add_to(m)
         elif geom.geom_type == 'Point':
             folium.Marker(location=(geom.y, geom.x), tooltip=name).add_to(m)
 
     # 3. Rendre la carte HTML dans Flask
     return render_template('folium.html', map=m._repr_html_())
+
 
 @app.route("/leaflet")
 def leaflet():
@@ -251,17 +269,17 @@ def elevation():
     qry = session.query(GPXTrack).filter(
         GPXTrack.id == 34
     )
-    trx=qry[0]
+    trx = qry[0]
     feature = geojson.Feature(
-            id=1,
-            geometry=shapely.geometry.mapping(to_shape(trx.geom)),
-            properties={"name": trx.name}
-        )
+        id=1,
+        geometry=shapely.geometry.mapping(to_shape(trx.geom)),
+        properties={"name": trx.name}
+    )
     collection = geojson.FeatureCollection([feature])
     return render_template('elevation.html', geojson=collection)
 
 
-@app.route('/upload', methods = ['POST'])
+@app.route('/upload', methods=['POST'])
 def upload_file():
     owner = session['user']['sub']
     print(request.form)
@@ -271,8 +289,8 @@ def upload_file():
         flash('No file part')
         return redirect(request.url)
     file = request.files['file']
-    comment=request.form.get('comment')
-    type=request.form.get('activity_type')
+    comment = request.form.get('comment')
+    type = request.form.get('activity_type')
     print("type : " + type)
     # If the user does not select a file, the browser submits an
     # empty file without a filename.
@@ -288,17 +306,19 @@ def upload_file():
         for track in gpx.tracks:
             print(track.name)
             start_time, end_time = gpx.get_time_bounds()
-            link=gpx.link
+            link = gpx.link
             # Calculate 3D distance in meters
             distance_3d = track.length_3d()
             print(f"Track: {track.name}, Distance: {distance_3d:.2f} meters")
-            
+
             # Calculate 2D distance
             distance_2d = track.length_2d()
-            print(f"Track: {track.name}, 2D Distance: {distance_2d:.2f} meters")
+            print(
+                f"Track: {track.name}, 2D Distance: {distance_2d:.2f} meters")
             # elevation gain
             elevation_gain, elevation_loss = calculate_elevation_gain(gpx)
-            print(f"Track: {track.name}, Elevation Gain: {elevation_gain:.2f} meters")
+            print(
+                f"Track: {track.name}, Elevation Gain: {elevation_gain:.2f} meters")
             # Access the first point of the first track
             start_point = None
             if track.segments:
@@ -309,57 +329,143 @@ def upload_file():
                     print(f"Start Longitude: {start_point.longitude}")
                     print(f"Start Elevation: {start_point.elevation}")
                     for segment in track.segments:
-                        point= segment.points[0]
-                        print ('Start at ({0},{1}) -> {2}'.format(point.latitude, point.longitude, point.elevation))
+                        point = segment.points[0]
+                        print(
+                            'Start at ({0},{1}) -> {2}'.format(point.latitude, point.longitude, point.elevation))
 
-            g = geocoder.google([start_point.latitude, start_point.longitude], method='reverse', key=os.getenv('GOOGLE_API_KEY'))
+            g = geocoder.google([start_point.latitude, start_point.longitude],
+                                method='reverse', key=os.getenv('GOOGLE_API_KEY'))
             print(g.json)
             # print( g.country_long +">" + g.state_long + ">" + g.county + ">" + g.city)
-            start_point_geo={'country': g.country_long, 'state': g.state_long, 'county': g.county, 'city': g.city}
+            start_point_geo = {'country': g.country_long,
+                               'state': g.state_long, 'county': g.county, 'city': g.city}
 
-            points = [(point.longitude, point.latitude, point.elevation) for segment in track.segments for point in segment.points]
+            points = [(point.longitude, point.latitude, point.elevation)
+                      for segment in track.segments for point in segment.points]
             line_string = LineString(points)
-            
+
             # Convert to WKT for insertion
             wkt = line_string.wkt
             try:
-                new_track = GPXTrack(name=track.name, geom=WKTElement(wkt, srid=4326)
-                                     , owner=owner
-                                     , type=type
-                                     , elevation_gain=elevation_gain
-                                     , elevation_loss=elevation_loss
-                                     , link=link
-                                     , start_time=start_time
-                                     , end_time=end_time
-                                     , insert_date=func.now()
-                                     , length=track.length_3d()
-                                     , comment=comment
-                                     , start_point_geo=start_point_geo)
+                new_track = GPXTrack(name=track.name, geom=WKTElement(wkt, srid=4326), owner=owner, type=type, elevation_gain=elevation_gain, elevation_loss=elevation_loss,
+                                     link=link, start_time=start_time, end_time=end_time, insert_date=func.now(), length=track.length_3d(), comment=comment, start_point_geo=start_point_geo)
                 sess.add(new_track)
-                print(f"Inserted track: {track.name} with {len(points)} points.")
-                sess.commit()    
+                print(
+                    f"Inserted track: {track.name} with {len(points)} points.")
+                sess.commit()
                 sess.close()
-            except Exception as e:  
+            except Exception as e:
                 print(f"Error inserting track: {track.name}, Error: {e}")
                 sess.rollback()
-                sess.close()            
+                sess.close()
         for waypoint in gpx.waypoints:
-            print ('waypoint {0} -> ({1},{2})'.format(waypoint.name, waypoint.latitude, waypoint.longitude))
+            print('waypoint {0} -> ({1},{2})'.format(waypoint.name,
+                  waypoint.latitude, waypoint.longitude))
 
         for route in gpx.routes:
-            print ('Route:')
+            print('Route:')
 
         return redirect("/alltrail")
-    
+
+
 @app.route('/search', methods=['GET'])
 def autocomplete():
     # Retrieve the search term sent by jQuery
     search = request.args.get('term')
-    print("search : " + search)    
-    results = ["titi","tata","toto"]
-        
+    print("search : " + search)
+    results = ["titi", "tata", "toto"]
+
     # Return JSON response
     return jsonify(results=results)
+
+
+@app.route('/api/collections', methods=['POST'])
+def create_collection():
+    """Create a new collection for the current user"""
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({'error': 'Collection name is required'}), 400
+
+    try:
+        # Get user ID from database
+        user_session = db.session
+        user = user_session.query(User).filter_by(
+            name=session['user']['name']).first()
+
+        if not user:
+            # Create user if doesn't exist
+            user = User(name=session['user']['name'], email=session['user']
+                        ['email'], uuid=session['user']['sub'])
+            user_session.add(user)
+            user_session.commit()
+
+        # Create new collection
+        new_collection = Collection(
+            name=data['name'],
+            user_id=user.id,
+            description=data.get('description', '')
+        )
+
+        user_session.add(new_collection)
+        user_session.commit()
+
+        result = {
+            'id': new_collection.id,
+            'name': new_collection.name,
+            'user_id': new_collection.user_id,
+            'description': new_collection.description
+        }
+
+        user_session.close()
+        return jsonify(result), 201
+
+    except Exception as e:
+        print(f"Error creating collection: {e}")
+        print(traceback.format_exc())
+
+        return jsonify({'error': 'Failed to create collection'}), 500
+
+
+@app.route('/api/collections/<int:collection_id>', methods=['DELETE'])
+def delete_collection(collection_id):
+    """Delete a collection for the current user"""
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        # Get user ID from database
+        user_session = db.session
+        user = user_session.query(User).filter_by(
+            name=session['user']['name']).first()
+
+        if not user:
+            user_session.close()
+            return jsonify({'error': 'User not found'}), 404
+
+        # Find the collection
+        collection = user_session.query(Collection).filter_by(
+            id=collection_id,
+            user_id=user.id
+        ).first()
+
+        if not collection:
+            user_session.close()
+            return jsonify({'error': 'Collection not found'}), 404
+
+        # Delete the collection
+        user_session.delete(collection)
+        user_session.commit()
+
+        user_session.close()
+        return jsonify({'message': 'Collection deleted successfully'}), 200
+
+    except Exception as e:
+        print(f"Error deleting collection: {e}")
+        return jsonify({'error': 'Failed to delete collection'}), 500
+
 
 if __name__ == "__main__":
     # app.run()

@@ -1,339 +1,114 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trail Explorer - Find Your Next Adventure</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <!-- leaflet-elevation -->
-    <link rel="stylesheet" href="https://unpkg.com/@raruto/leaflet-elevation/dist/leaflet-elevation.css" />
-    <script src="https://unpkg.com/@raruto/leaflet-elevation/dist/leaflet-elevation.js"></script>
-    <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Merriweather:wght@400;700&display=swap"
-        rel="stylesheet">
+{% block content %}
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='trail.css') }}" />
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-    <link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/ui-lightness/jquery-ui.css" rel="stylesheet"
-        type="text/css" />
-
-</head>
-
-<body>
-    <header>
-        <div class="header-content">
-            <a href="/" class="logo">
-                <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path
-                        d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                </svg>
-                Trail Explorer
-            </a>
-            <nav>
-                <a href="#">Explore</a>
-                <a href="#">My Trails</a>
-                <a href="#">Guides</a>
-                <div align="right"> {% if 'user' in session %}
-                    <span><img src="{{ session['user']['picture'] }}" width="40" height="40"
-                            alt="{{ session['user']['email'] }}" /><br><a href="/auth/logout">Logout</a></span>
-                    {% else %}
-                    <a href="/auth/login">Login</a>
-                    {% endif %}
-                </div>
-            </nav>
+<section class="hero">
+    <!-- <h2>Find Your Perfect Trail</h2> -->
+    <!-- <p>Discover hiking trails, running paths, and outdoor adventures near you> -->
+    <script>
+        function openForm() {
+            document.querySelector('#myForm').style.display = "block";
+        }
+        function closeForm() {
+            document.querySelector('#myForm').style.display = "none";
+        }
+    </script>
+    <div class="search-container">
+        <button onclick="openForm()" class="openButton">Nouvelle trace</button>
+        <!-- Conteneur du popup -->
+        <div id="myForm" class="form-popup">
+            <form method=post action="/upload" enctype=multipart/form-data class="form-container">
+                <label for="file">Select a file:</label><input type=file name=file></input><br>
+                <!-- <input type=text name=type_activity placeholder="Type (e.g., hiking, biking)"></input><br> -->
+                <label for="activity_type">Activity Type:</label>
+                <select name="activity_type" id="activity_type">
+                    <option value="HIKE">Hike</option>
+                    <option value="OFFROAD">Off-road</option>
+                </select><br>
+                <label for="comment">Commentaire:</label><br>
+                <textarea rows="10" cols="50" name=comment placeholder="Add a comment"></textarea><br>
+                <input type=submit value=Upload></input>
+                <button type="button" class="btn cancel" onclick="closeForm()">Fermer</button>
+            </form>
         </div>
-    </header>
-
-    <section class="hero">
-        <!-- <h2>Find Your Perfect Trail</h2> -->
-        <!-- <p>Discover hiking trails, running paths, and outdoor adventures near you> -->
         <script>
-            function openForm() {
-                document.querySelector('#myForm').style.display = "block";
-            }
-            function closeForm() {
-                document.querySelector('#myForm').style.display = "none";
-            }
-        </script>
-        <div class="search-container">
-            <button onclick="openForm()" class="openButton">Nouvelle trace</button>
-            <!-- Conteneur du popup -->
-            <div id="myForm" class="form-popup">
-                <form method=post action="/upload" enctype=multipart/form-data class="form-container">
-                    <label for="file">Select a file:</label><input type=file name=file></input><br>
-                    <!-- <input type=text name=type_activity placeholder="Type (e.g., hiking, biking)"></input><br> -->
-                    <label for="activity_type">Activity Type:</label>
-                    <select name="activity_type" id="activity_type">
-                        <option value="HIKE">Hike</option>
-                        <option value="OFFROAD">Off-road</option>
-                    </select><br>
-                    <label for="comment">Commentaire:</label><br>
-                    <textarea rows="10" cols="50" name=comment placeholder="Add a comment"></textarea><br>
-                    <input type=submit value=Upload></input>
-                    <button type="button" class="btn cancel" onclick="closeForm()">Fermer</button>
-                </form>
-            </div>
-            <script>
+            $(function () {
+                var availableTags = ["aaaa", "bbbff", "ccceerr", "ddddd", "eeeee"];
+
                 $(function () {
-                    var availableTags = ["aaaa", "bbbff", "ccceerr", "ddddd", "eeeee"];
-
-                    $(function () {
-                        $("#search-input").autocomplete({
-                            source: availableTags, // Use the availableTags array for autocomplete suggestions
-                            minLength: 2 // Trigger after 2 characters
-                        });
+                    $("#search-input").autocomplete({
+                        source: availableTags, // Use the availableTags array for autocomplete suggestions
+                        minLength: 2 // Trigger after 2 characters
                     });
-
-
                 });
-            </script>
-            <div>
-                <input type="text" id="search-input" class="search-input" placeholder="Where do you want to go?">
-                <button class="search-btn">Search</button>
-            </div>
-        </div>
 
-        <dialog id="my-dialog" popover>
-            <p>This dialog was opened using a popovertargetaction attribute.</p>
-            <button popovertarget="my-dialog" popovertargetaction="hide">Close</button>
-        </dialog>
-    </section>
 
-    <section class="filters">
-        <div class="filters-content">
-            <button class="filter-btn active">All Trails</button>
-            <button class="filter-btn">Hiking</button>
-            <button class="filter-btn">Running</button>
-            <button class="filter-btn">Walking</button>
-            <button class="filter-btn">Mountain Biking</button>
-            <button class="filter-btn">Backpacking</button>
-        </div>
-    </section>
-
-    <script>selectTrail = function (trail) {
-            // Logique pour récupérer les détails du trail sélectionné
-            console.log("Trail selected: " + trail);
-            // Mettre à jour la section des détails du trail avec les informations correspondantes
-            document.getElementById("trail-info").innerHTML = "<h3>" + trail + "</h3><p>Detailed information about the trail will be displayed here.</p>";
-            document.getElementById("map_detail").innerHTML = "<p>Map and elevation profile for " + trail + " will be displayed here.</p>";
-
-            // window.controlElevation.load("https://raruto.github.io/leaflet-elevation/examples/via-emilia.gpx");
-            window.controlElevation.clear();
-            window.controlElevation.addData(trail.geom);
-
-        }</script>
-    <main class="main-content">
-        <!-- Left column - Trail List -->
-        <div class="trails-list">
-            <h2>Trail List</h2>
-            {% for track in track_list %}
-            <div class="trail-item" onclick="selectTrail('{{ track }}')">
-                <h3>{{track.name}}<span class=" difficulty hard">Hard</span></h3>
-                <p>📍 description</p>
-                <p>distance : {{track.length}}</p>
-                <p>type : {{track.type}}</p>
-            </div>
-            {% endfor %}
-        </div>
-        <!-- Middle column - Map -->
-        <div class="map-container">
-            {{ script_map | safe }}
-        </div>
-
-        <!-- Right column - Trail Details -->
-        <div class=" trail-details">
-            <h2>Trail Details</h2>
-            <div class="map-section">
-                <div id="map_detail"></div>
-            </div>
-            <div id="trail-info">
-            </div>
-            <!-- <div id="elevation-div">{{ map_detail | safe }}</div> -->
-
-        </div>
-    </main>
-
-    <footer>
-        </main>
-
-        <footer>
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h4>Company</h4>
-                    <a href="#">About Us</a>
-                    <a href="#">Careers</a>
-                    <a href="#">Press</a>
-                    <a href="#">Blog</a>
-                </div>
-                <div class="footer-section">
-                    <h4>Explore</h4>
-                    <a href="#">Trail Maps</a>
-                    <a href="#">Guides</a>
-                    <a href="#">Collections</a>
-                    <a href="#">Expert Reviews</a>
-                </div>
-                <div class="footer-section">
-                    <h4>Community</h4>
-                    <a href="#">Write a Review</a>
-                    <a href="#">Add a Trail</a>
-                    <a href="#">Photos</a>
-                    <a href="#">Forums</a>
-                </div>
-                <div class="footer-section">
-                    <h4>Support</h4>
-                    <a href="#">Help Center</a>
-                    <a href="#">Contact Us</a>
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>© 2026 Trail Explorer. All rights reserved.</p>
-            </div>
-        </footer>
-
-        <script>
-            // Initialize map
-
-            // var map_detail = L.map('map_detail').setView([39.7392, -104.9903], 10);
-
-            // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            //     attribution: '© OpenStreetMap contributors'
-            // }).addTo(map_detail);
-
-            // { { leaflet.render_map(map_detail, class_ = 'h-[200px]', zoom = 10) } }
-            // { { map_detail | safe } }
-
+            });
         </script>
-        <script>
-            // Full list options at "leaflet-elevation.js"
-            var elevation_options = {
+        <div>
+            <input type="text" id="search-input" class="search-input" placeholder="Where do you want to go?">
+            <button class="search-btn">Search</button>
+        </div>
+    </div>
 
-                // Default chart colors: theme lime-theme, magenta-theme, ...
-                theme: "lightblue-theme",
+    <dialog id="my-dialog" popover>
+        <p>This dialog was opened using a popovertargetaction attribute.</p>
+        <button popovertarget="my-dialog" popovertargetaction="hide">Close</button>
+    </dialog>
+</section>
 
-                // Chart container outside/inside map container
-                detached: true,
+<section class="filters">
+    <div class="filters-content">
+        <button class="filter-btn active">All Trails</button>
+        <button class="filter-btn">Hiking</button>
+        <button class="filter-btn">Running</button>
+        <button class="filter-btn">Walking</button>
+        <button class="filter-btn">Mountain Biking</button>
+        <button class="filter-btn">Backpacking</button>
+    </div>
+</section>
 
-                // if (detached), the elevation chart container
-                // elevationDiv: "#elevation-div",
+<script>selectTrail = function (trail) {
+        // Logique pour récupérer les détails du trail sélectionné
+        console.log("Trail selected: " + trail);
+        // Mettre à jour la section des détails du trail avec les informations correspondantes
+        document.getElementById("trail-info").innerHTML = "<h3>" + trail + "</h3><p>Detailed information about the trail will be displayed here.</p>";
+        document.getElementById("map_detail").innerHTML = "<p>Map and elevation profile for " + trail + " will be displayed here.</p>";
 
-                // if (!detached) autohide chart profile on chart mouseleave
-                autohide: false,
+        // window.controlElevation.load("https://raruto.github.io/leaflet-elevation/examples/via-emilia.gpx");
+        window.controlElevation.clear();
+        window.controlElevation.addData(trail.geom);
 
-                // if (!detached) initial state of chart profile control
-                collapsed: false,
+    }</script>
+<main class="main-content">
+    <!-- Left column - Trail List -->
+    <div class="trails-list">
+        <h2>Trail List</h2>
+        {% for track in track_list %}
+        <div class="trail-item" onclick="selectTrail('{{ track }}')">
+            <h3>{{track.name}}<span class=" difficulty hard">Hard</span></h3>
+            <p>📍 description</p>
+            <p>distance : {{track.length}}</p>
+            <p>type : {{track.type}}</p>
+        </div>
+        {% endfor %}
+    </div>
+    <!-- Middle column - Map -->
+    <div class="map-container">
+        {{ script_map | safe }}
+    </div>
 
-                // if (!detached) control position on one of map corners
-                position: "topright",
+    <!-- Right column - Trail Details -->
+    <div class=" trail-details">
+        <h2>Trail Details</h2>
+        <div class="map-section">
+            <div id="map_detail"></div>
+        </div>
+        <div id="trail-info">
+        </div>
+        <!-- <div id="elevation-div">{{ map_detail | safe }}</div> -->
 
-                // Toggle close icon visibility
-                closeBtn: true,
+    </div>
+</main>
 
-                // Autoupdate map center on chart mouseover.
-                followMarker: true,
-
-                // Autoupdate map bounds on chart update.
-                autofitBounds: true,
-
-                // Chart distance/elevation units.
-                imperial: false,
-
-                // [Lat, Long] vs [Long, Lat] points. (leaflet default: [Lat, Long])
-                reverseCoords: false,
-
-                // Acceleration chart profile: true || "summary" || "disabled" || false
-                acceleration: false,
-
-                // Slope chart profile: true || "summary" || "disabled" || false
-                slope: false,
-
-                // Speed chart profile: true || "summary" || "disabled" || false
-                speed: false,
-
-                // Altitude chart profile: true || "summary" || "disabled" || false
-                altitude: true,
-
-                // Display time info: true || "summary" || false
-                time: true,
-
-                // Display distance info: true || "summary" || false
-                distance: true,
-
-                // Summary track info style: "inline" || "multiline" || false
-                summary: 'multiline',
-
-                // Download link: "link" || false || "modal"
-                downloadLink: 'link',
-
-                // Toggle chart ruler filter
-                ruler: true,
-
-                // Toggle chart legend filter
-                legend: true,
-
-                // Toggle "leaflet-almostover" integration
-                almostOver: true,
-
-                // Toggle "leaflet-distance-markers" integration
-                distanceMarkers: false,
-
-                // Toggle "leaflet-edgescale" integration
-                edgeScale: false,
-
-                // Toggle "leaflet-hotline" integration
-                hotline: true,
-
-                // Display track datetimes: true || false
-                timestamps: false,
-
-                // Display track waypoints: true || "markers" || "dots" || false
-                waypoints: true,
-
-                // Toggle custom waypoint icons: true || { associative array of <sym> tags } || false
-                wptIcons: {
-                    '': L.divIcon({
-                        className: 'elevation-waypoint-marker',
-                        html: '<i class="elevation-waypoint-icon"></i>',
-                        iconSize: [30, 30],
-                        iconAnchor: [8, 30],
-                    }),
-                },
-
-                // Toggle waypoint labels: true || "markers" || "dots" || false
-                wptLabels: true,
-
-                // Render chart profiles as Canvas or SVG Paths
-                preferCanvas: true,
-
-            };
-
-            // Instantiate map (leaflet-ui).
-            var map = L.map('map_detail', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
-            // var map2 = L.map('ma_carte_unique123', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
-
-            // Instantiate elevation control.
-            var controlElevation = L.control.elevation(elevation_options).addTo(map);
-            // var controlElevation2 = L.control.elevation(elevation_options).addTo(map2);
-
-            // Rendre controlElevation accessible globalement
-            window.controlElevation = controlElevation;
-
-            // Données GeoJSON des tracks depuis le backend
-            // { { geojson_data | safe } };
-
-            // // Créer les variables de données pour chaque track
-            // for (var trackId in geojsonData) {
-            //     window[trackId + '_data'] = geojsonData[trackId];
-            // }
-
-            // Load track from url (allowed data types: "*.geojson", "*.gpx", "*.tcx")
-            // controlElevation.load("https://raruto.github.io/leaflet-elevation/examples/via-emilia.gpx");
-
-        </script>
-</body>
-
-</html>
+{% endblock %}

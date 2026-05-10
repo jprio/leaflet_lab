@@ -1,28 +1,30 @@
+from dotenv import load_dotenv
+from shapely.geometry import LineString
+from geoalchemy2 import Geometry
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine, Column, Integer, String
+import geopandas as gpd
+from geoalchemy2 import Geometry, WKTElement
+import gpxpy
+import psycopg2
+from app.models.domain import GPXTrack
 import sys
 import os
 sys.path.append(os.path.join('..', 'src'))
-from app.models.domain import GPXTrack
-import psycopg2
 
-import gpxpy
-from geoalchemy2 import Geometry, WKTElement
-import geopandas as gpd
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from geoalchemy2 import Geometry
-from shapely.geometry import LineString
-
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker 
+load_dotenv()
 
 
 def get_engine():
-    engine = create_engine(f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
-    return  engine
+    engine = create_engine(
+        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+    return engine
+
 
 def conn_aiven_test():
-    conn = psycopg2.connect(f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+    conn = psycopg2.connect(
+        f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
 
     query_sql = 'SELECT VERSION()'
 
@@ -36,8 +38,10 @@ def conn_aiven_test():
     cur.execute(add_postgis)
     conn.commit()
 
+
 def create_tables():
-    conn = psycopg2.connect(f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+    conn = psycopg2.connect(
+        f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
     cur = conn.cursor()
     # cur.execute("""
     #     CREATE TABLE IF NOT EXISTS tracks (
@@ -55,11 +59,13 @@ def create_tables():
     """)
     conn.commit()
 
+
 def test_save_gpx():
     import glob
 
     files = glob.glob("tests/gpx/*.gpx")
-    engine = create_engine(f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+    engine = create_engine(
+        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
     for file in files:
         # 1. Charger et parser le GPX
         with open(file, "r") as f:
@@ -79,23 +85,27 @@ def test_save_gpx():
         Session = sessionmaker(bind=engine)
         session = Session()
         for track in gpx.tracks:
-            points = [(point.longitude, point.latitude) for segment in track.segments for point in segment.points]
+            points = [(point.longitude, point.latitude)
+                      for segment in track.segments for point in segment.points]
             line_string = LineString(points)
-            
+
             # Convert to WKT for insertion
             wkt = line_string.wkt
-            
-            new_track = GPXTrack(name=track.name, geom=WKTElement(wkt, srid=4326))
+
+            new_track = GPXTrack(
+                name=track.name, geom=WKTElement(wkt, srid=4326))
             session.add(new_track)
             print(f"Inserted track: {track.name} with {len(points)} points.")
-            session.commit()    
+            session.commit()
             # Insertion directe ou via GeoPandas.to_postgis avec dtype={'geometry': Geometry('POINT', srid=4326)}
 
 # create_tables()
+
+
 def test_postgis_to_geojson():
     engine = get_engine()
     from sqlalchemy.ext.declarative import declarative_base
-    from sqlalchemy.orm import sessionmaker 
+    from sqlalchemy.orm import sessionmaker
     from geojson import Feature, FeatureCollection
     from geoalchemy2.shape import to_shape
 
@@ -107,31 +117,32 @@ def test_postgis_to_geojson():
 
     # SELECT ST_AsGeoJSON(geom) FROM table
     # trx=session.query(GPXTrack.name, GPXTrack.geom.ST_AsGeoJSON()).filter(
-    trx=session.query(GPXTrack.name, GPXTrack.geom).filter(
+    trx = session.query(GPXTrack.name, GPXTrack.geom).filter(
         GPXTrack.id == 34)
     import shapely.geometry
     features = []
     for name, geom in trx:
         feature = Feature(
-                id=1,
-                geometry=shapely.geometry.mapping(to_shape(geom)),
-                properties={"name": name}
-            )
+            id=1,
+            geometry=shapely.geometry.mapping(to_shape(geom)),
+            properties={"name": name}
+        )
         features.append(feature)
         collection = FeatureCollection(features)
         print(collection)
         # geojson_geometry = shapely.geometry.mapping(geom_json)
-        # print(f"Track: {name}, Geometry (GeoJSON): {geom_json[:100]}")    
+        # print(f"Track: {name}, Geometry (GeoJSON): {geom_json[:100]}")
         # print(feature = geojson.Feature(geometry=geojson_geometry)
 
 
 def pandas_read_postgis_to_geojson():
     engine = get_engine()
-    gdf = gpd.read_postgis("SELECT name, geom FROM gpx_tracks", con=engine, geom_col='geom')
+    gdf = gpd.read_postgis(
+        "SELECT name, geom FROM gpx_tracks", con=engine, geom_col='geom')
     print(gdf.head())
     # gdf.to_file("gpx_tracks.geojson", driver='GeoJSON')
     print(gdf.shape)
-    
+
 
 def alchemy_test():
     from sqlalchemy import create_engine
@@ -149,7 +160,8 @@ def alchemy_test():
 
     Session = sessionmaker(bind=engine)
     session = Session()
-    locations = session.query(GPXTrack).filter(GPXTrack.name.like('%Lake%')).all()
+    locations = session.query(GPXTrack).filter(
+        GPXTrack.name.like('%Lake%')).all()
     for location in locations:
         print("gpx trouvé : " + str(location.name))
         # print("geom : " + str(location.geom))
@@ -168,6 +180,7 @@ def alchemy_test():
         # # Length is now in meters
         # print(line_projected.length)
 
+
 def alchemy_test_mean_location():
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -184,8 +197,24 @@ def alchemy_test_mean_location():
     df_mean = pd.read_sql(query, engine.connect())
     print(df_mean)
 
+
+def alchemy_test_relationship():
+    engine = create_engine(
+        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require',
+        echo=True,
+        plugins=["geoalchemy2"]
+    )
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    from app.models.domain import User, Collection
+    user = session.query(User).filter_by(
+        name="Jean-Pierre Rio").first()
+    print(user)
+
+
 # pandas_read_postgis_to_geojson()
-test_postgis_to_geojson()
+# test_postgis_to_geojson()
 # test_save_gpx()
 # alchemy_test()
 # alchemy_test_mean_location()
+alchemy_test_relationship()
