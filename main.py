@@ -1,8 +1,6 @@
 from app.models.db import db
 from flask import Flask, render_template, make_response, redirect, request, session, g, flash, url_for, Blueprint, jsonify
 from flask_cors import CORS, cross_origin
-from flask_leaflet import Leaflet
-from flask_leaflet import Map
 import folium
 from folium import Element
 from datetime import timedelta, datetime
@@ -14,7 +12,6 @@ import os
 from werkzeug.utils import secure_filename
 import gpxpy
 import pandas as pd
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from geoalchemy2 import Geometry, WKTElement
 from shapely.geometry import LineString
@@ -22,7 +19,7 @@ from app.models.domain import Base, User, Collection, GPXTrack
 import app.models .persistence as persistence
 import geopandas as gpd
 from geoalchemy2.shape import to_shape
-from sqlalchemy import select, func
+# from sqlalchemy import select, func
 from app.utils.gpxutils import calculate_elevation_gain
 from flask_sqlalchemy import SQLAlchemy
 import geocoder
@@ -41,8 +38,6 @@ def create_app():
                 static_folder='static')
     CORS(app)
 
-    leaflet = Leaflet()
-    leaflet.init_app(app)
     models.init_app(app)
     routes.init_app(app)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
@@ -261,12 +256,6 @@ def folium_map():
 
     # 3. Rendre la carte HTML dans Flask
     return render_template('folium.html', map=m._repr_html_())
-
-
-@app.route("/leaflet")
-def leaflet():
-    my_map = Map('my-map', center=[-41.139416, -73.025431], zoom=16)
-    return render_template('leaflet.html', my_map=my_map)
 
 
 def allowed_file(filename):
