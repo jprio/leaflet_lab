@@ -42,7 +42,7 @@ def create_app():
     routes.init_app(app)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_host=1)
     app.secret_key = "123"
-    app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require'
+    app.config["SQLALCHEMY_DATABASE_URI"] = f'postgresql+psycopg://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require'
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_size': 10,
         'max_overflow': 20,
