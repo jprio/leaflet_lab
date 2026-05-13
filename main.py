@@ -104,6 +104,58 @@ def alltrail():
         }
         """)
 
+    zoom_script = """
+    $(document).ready(function(){
+        ma_carte_unique123.on('zoomend', function() {
+            updateUrl(ma_carte_unique123);
+
+        })
+    });
+        
+        
+    $(document).ready(function(){
+        ma_carte_unique123.on('moveend', function() {
+            updateUrl(ma_carte_unique123);
+            })
+        });
+    
+        $(document).ready(updateUrl=function(map){
+            console.log(map);
+            var currentZoom = ma_carte_unique123.getZoom();
+            // Example: Hide marker if zoom is less than 10
+            // You would need to reference the specific layer object here
+            console.log(currentZoom)
+            console.log(ma_carte_unique123)
+            var bounds = ma_carte_unique123.getBounds();
+            var northWest = bounds.getNorthWest(); // {lat: ..., lng: ...}
+            var southEast = bounds.getSouthEast(); // {lat: ..., lng: ...}
+            var center = map.getCenter();
+            var lat = center.lat;
+            var lng = center.lng;
+            console.log("NW Lat: " + northWest.lat);
+            console.log("NW Lng: " + northWest.lng);
+            console.log("SE Lat: " + southEast.lat);
+            console.log("SE Lng: " + southEast.lng);
+
+            // Get current URL and create URL object
+            const url = new URL(window.parent.location.href);
+
+            // 1. Add or update a parameter
+            url.searchParams.set('zoom', currentZoom);
+
+            // 2. Add a parameter with multiple values
+            url.searchParams.set('filter', 'active');
+
+            // 3. Remove a parameter
+            //url.searchParams.delete('old_param');
+
+            url.searchParams.set('lat', center.lat);
+            url.searchParams.set('lng', center.lng);
+
+            // Update the browser URL without reload
+            window.parent.history.replaceState({}, document.title, url.toString());
+        });
+    """
     db_session = db.session
     with db_session.connection() as conn:
         gdf_tracks = gpd.GeoDataFrame.from_postgis(
@@ -111,8 +163,13 @@ def alltrail():
 
         query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks;"
         df_mean = pd.read_sql(query, conn)
-        m = folium.Map(location=[df_mean['mean_latitude'].iloc[0],
-                       df_mean['mean_longitude'].iloc[0]], zoom_start=8, tiles='OpenStreetMap')
+        m = folium.Map(
+            location=[df_mean['mean_latitude'].iloc[0],
+                      df_mean['mean_longitude'].iloc[0]],
+            zoom_start=8,
+            tiles='OpenStreetMap',
+        )
+        m.get_root().script.add_child(folium.Element(zoom_script))
 
         folium.TileLayer(tiles='https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
                          attr='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
