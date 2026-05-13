@@ -34,7 +34,7 @@
                 <div class="collection-content">
                     <h3>{{ track.name }}</h3>
                     <p>Type : {{ track.type or 'N/A' }}</p>
-                    <p>Distance : {{ track.length or 'N/A' }}</p>
+                    <p>Distance : {{ '%.2f' % track.length or 'N/A' }}</p>
                     <p>{{ track.comment or 'Aucun commentaire disponible.' }}</p>
                     <div class="collection-actions" style="margin-top: 1rem;">
                         <a href="/alltrail" class="btn-primary">Voir sur la carte</a>
