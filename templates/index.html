@@ -29,6 +29,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.js"
         integrity="sha512-FatQYmF8k/KuvOgmwfRGRqlyzbG13etWz1GOO+JO6YQyhGgw5tVl9ihC9RS8S6iiS18CZAnZBvUoKHlGI6BTPQ=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/ui-lightness/jquery-ui.css" rel="stylesheet"
+        type="text/css" />
 
     <style>
         html,
@@ -64,6 +68,85 @@
         </div>
         <div id="map" style="width: 50%; height: 100%;">
             <script>
+
+                function fetch_and_draw_data({ NW_lat, NW_lon, SE_lat, SE_lon, fitbounds } = {}) {
+                    fetch('find_tracks?NW_lon=' + NW_lon + '&SE_lon=' + SE_lon + '&NW_lat=' + NW_lat + '&SE_lat=' + SE_lat)
+                        .then(response => response.json())
+                        .then(data => {
+                            var layer = L.geoJSON(data, {
+                                style: function (feature) {
+                                    switch (feature.properties.type) {
+                                        case 'HIKE': return { color: "#ff0000" };
+                                        case 'OFFROAD': return { color: "#0000ff" };
+                                    }
+                                },
+                                pointToLayer: function (feature, latlng) {
+                                    return L.circleMarker(latlng, { color: 'orange', radius: 8 });
+                                },
+                                onEachFeature: function (feature, layer) {
+                                    layer.bindPopup(
+                                        "<img src='img/" + feature.properties.img_name + "' width='259'/><br><b>Name: </b>"
+                                        + feature.properties.Name + "<br><b>Description: </b>" + feature.properties.description);
+                                }
+                            }).addTo(map);
+                            if (fitbounds) {
+                                map.fitBounds(layer.getBounds());
+                            }
+                        });
+                }
+                $(document).ready(function () {
+                    map.on('zoomend', function () {
+                        updateUrl(map);
+
+                    })
+                });
+
+
+                $(document).ready(function () {
+                    map.on('moveend', function () {
+                        updateUrl(map);
+                    })
+                });
+
+                $(document).ready(updateUrl = function (map) {
+                    console.log(map);
+                    var currentZoom = map.getZoom();
+                    // Example: Hide marker if zoom is less than 10
+                    // You would need to reference the specific layer object here
+                    console.log(currentZoom)
+                    var bounds = map.getBounds();
+                    var northWest = bounds.getNorthWest(); // {lat: ..., lng: ...}
+                    var southEast = bounds.getSouthEast(); // {lat: ..., lng: ...}
+                    var center = map.getCenter();
+                    var lat = center.lat;
+                    var lng = center.lng;
+                    console.log("NW Lat: " + northWest.lat);
+                    console.log("NW Lng: " + northWest.lng);
+                    console.log("SE Lat: " + southEast.lat);
+                    console.log("SE Lng: " + southEast.lng);
+                    fetch_and_draw_data({ NW_lat: northWest.lat, NW_lon: northWest.lng, SE_lat: southEast.lat, SE_lon: southEast.lng, fitbounds: false });
+
+                    // Get current URL and create URL object
+                    const url = new URL(window.parent.location.href);
+
+                    // 1. Add or update a parameter
+                    url.searchParams.set('zoom', currentZoom);
+
+                    // 2. Add a parameter with multiple values
+                    url.searchParams.set('filter', 'active');
+
+                    // 3. Remove a parameter
+                    //url.searchParams.delete('old_param');
+
+                    url.searchParams.set('lat', center.lat);
+                    url.searchParams.set('lng', center.lng);
+
+                    // Update the browser URL without reload
+                    window.parent.history.replaceState({}, document.title, url.toString());
+                });
+
+            </script>
+            <script>
                 var map = L.map('map').setView([51.505, -0.09], 13);
                 const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
@@ -74,16 +157,7 @@
                     ],
                     null
                 ).addTo(map);
-
-                var gpx = 'https://jprio-gpx.s3.eu-west-3.amazonaws.com/boz-uchuk-lakes-jyrgalan-region.gpx';
-                new L.GPX(gpx, { async: true }).on('loaded', function (e) {
-                    map.fitBounds(e.target.getBounds());
-                }).addTo(map);
-
-                new L.GPX("boz.gpx", { async: true }).on('loaded', function (e) {
-                    map.fitBounds(e.target.getBounds());
-                }).addTo(map);
-
+                fetch_and_draw_data({ NW_lat: 42.71069600569497, NW_lon: 76.06109619140626, SE_lat: 41.48800607185427, SE_lon: 79.14550781250001, fitbounds: true });
             </script>
         </div>
         <div style="width: 30%; padding: 20px; overflow-y: auto; border-left: 1px solid #ddd;">

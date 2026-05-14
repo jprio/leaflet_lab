@@ -9,7 +9,7 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-from sqlalchemy import Table, Column, Integer, String, MetaData, Sequence, Identity, DateTime, Date
+from sqlalchemy import Table, Column, Integer, String, MetaData, Sequence, Identity, DateTime, Date, BigInteger
 from geoalchemy2 import Geometry, WKTElement
 from shapely.geometry import LineString
 from sqlalchemy import event, func
@@ -72,7 +72,7 @@ class Collection(Base):
 class GPXTrack(Base):
     __tablename__ = 'gpx_tracks'
     __allow_unmapped__ = True
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, primary_key=True)
     elevation_gain = Column(Integer)
     elevation_loss = Column(Integer)
     length = Column(Integer)
@@ -81,7 +81,7 @@ class GPXTrack(Base):
     comment = Column(String)
     start_point_geo = Column(JSON, nullable=False, default=dict)
     link = Column(String)
-    owner = Column(Integer, nullable=False)
+    owner = Column(String, nullable=False)
     geom = Column(Geometry(geometry_type='LINESTRING', srid=4326))
     insert_date: Column[datetime] = Column(
         DateTime, server_default=func.now(), onupdate=func.now())

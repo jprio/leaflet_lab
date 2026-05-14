@@ -7,10 +7,10 @@ from sqlalchemy import create_engine, Column, Integer, String
 import geopandas as gpd
 from geoalchemy2 import Geometry, WKTElement
 import gpxpy
-import psycopg2
 from app.models.domain import GPXTrack
 import sys
 import os
+import psycopg
 sys.path.append(os.path.join('..', 'src'))
 
 load_dotenv()
@@ -18,12 +18,12 @@ load_dotenv()
 
 def get_engine():
     engine = create_engine(
-        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+        f'postgresql+psycopg://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
     return engine
 
 
 def conn_aiven_test():
-    conn = psycopg2.connect(
+    conn = psycopg.connect(
         f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
 
     query_sql = 'SELECT VERSION()'
@@ -212,9 +212,31 @@ def alchemy_test_relationship():
     print(user)
 
 
+def geopandas_search_test():
+    engine = get_engine()
+
+    # Filter by bounding box using SQL
+    sql = """
+    SELECT *
+    FROM gpx_tracks
+    WHERE ST_X(ST_StartPoint(geom)) BETWEEN 76.06109619140626 AND 79.14550781250001 
+    AND ST_Y(ST_StartPoint(geom)) BETWEEN 41.48800607185427 AND 42.71069600569497
+    """
+    sql2 = """
+    SELECT *
+    FROM gpx_tracks
+    WHERE ST_X(ST_StartPoint(geom)) BETWEEN 77.96447753906251 AND 78.70742797851564 
+    AND ST_Y(ST_StartPoint(geom)) BETWEEN 41.95029860413911 AND 42.56016134191609
+    """
+
+    gdf = gpd.read_postgis(sql2, engine, geom_col='geom')
+    print(gdf.shape)
+
+
 # pandas_read_postgis_to_geojson()
 # test_postgis_to_geojson()
 # test_save_gpx()
 # alchemy_test()
 # alchemy_test_mean_location()
-alchemy_test_relationship()
+# alchemy_test_relationship()
+geopandas_search_test()

@@ -6,6 +6,8 @@ from folium import Element
 from datetime import timedelta, datetime
 import requests
 import json
+from sqlalchemy.sql import func
+
 from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 import os
@@ -212,6 +214,7 @@ def alltrail():
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
         gdf_tracks['comment'].str.replace('\r\n', '<br>')
 
+        # split par type de track pour coloriser
         for type in gdf_tracks['type'].unique():
             tooltip = folium.GeoJsonTooltip(
                 fields=["name", "type", "length", "elevation_gain", "elevation_loss", "insert_date",
@@ -272,10 +275,53 @@ def alltrail():
     )
 
 
+@app.route("/find_tracks")
+def find_tracks():
+    NW_lat = request.args.get('NW_lat')
+    NW_lon = request.args.get('NW_lon')
+    SE_lat = request.args.get('SE_lat')
+    SE_lon = request.args.get('SE_lon')
+    print(request.args)
+    category = request.args.get('category')
+    db_session = db.session
+    with db_session.connection() as conn:
+
+        # Filter by bounding box using SQL
+        sql = f"""
+        SELECT *
+        FROM gpx_tracks
+        WHERE ST_X(ST_StartPoint(geom)) BETWEEN {NW_lon} AND {SE_lon} 
+        AND ST_Y(ST_StartPoint(geom)) BETWEEN {SE_lat} AND {NW_lat}
+        """
+        # print(sql)
+        gdf_tracks = gpd.GeoDataFrame.from_postgis(sql, con=conn)
+        # print(gdf_tracks)
+        if gdf_tracks.empty:
+            return gdf_tracks.to_json()
+
+        gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
+            '%Y-%m-%d %H:%M:%S')
+        gdf_tracks['duration'] = 0
+        try:
+            gdf_tracks['duration'] = (
+                gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+            gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+            gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            print(f"Error formatting start_time or end_time: {e}")
+        gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
+        gdf_tracks['link'] = gdf_tracks['link'].fillna('')
+        gdf_tracks['comment'].str.replace('\r\n', '<br>')
+
+        return gdf_tracks.to_json()
+
+
 @app.route("/")
-def map():
-    response = make_response(render_template("index.html"))
-    return response
+def index():
+    # return redirect("/alltrail")
+    return render_template("index.html")
 
 
 @app.route("/folium")
@@ -407,9 +453,11 @@ def upload_file():
 
             # Convert to WKT for insertion
             wkt = line_string.wkt
+            print("start time " + str(start_time))
+            print(datetime.now().isoformat(timespec='seconds'))
             try:
                 new_track = GPXTrack(name=track.name, geom=WKTElement(wkt, srid=4326), owner=owner, type=type, elevation_gain=elevation_gain, elevation_loss=elevation_loss,
-                                     link=link, start_time=start_time, end_time=end_time, insert_date=func.now(), length=track.length_3d(), comment=comment, start_point_geo=start_point_geo)
+                                     link=link, start_time=start_time, end_time=end_time, insert_date=datetime.now().isoformat(timespec='seconds'), length=track.length_3d(), comment=comment, start_point_geo=start_point_geo)
                 sess.add(new_track)
                 print(
                     f"Inserted track: {track.name} with {len(points)} points.")
