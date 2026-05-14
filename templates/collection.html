@@ -14,7 +14,7 @@
                 style="display: inline-flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem;">
                 <div class="stat-icon">📚</div>
                 <div class="stat-content">
-                    <div class="stat-number">{{ collection.tracks | length }}</div>
+                    <div class="stat-number" id="collectionTrackCount">{{ collection.tracks | length }}</div>
                     <div class="stat-label">Trails dans la collection</div>
                 </div>
             </div>
@@ -36,8 +36,11 @@
                     <p>Type : {{ track.type or 'N/A' }}</p>
                     <p>Distance : {{ '%.2f' % track.length or 'N/A' }}</p>
                     <p>{{ track.comment or 'Aucun commentaire disponible.' }}</p>
-                    <div class="collection-actions" style="margin-top: 1rem;">
+                    <div class="collection-actions"
+                        style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <a href="/alltrail" class="btn-primary">Voir sur la carte</a>
+                        <button type="button" class="btn-secondary"
+                            onclick="event.stopPropagation(); removeTrackFromCollection({{ collection.id }}, {{ track.id }}, this)">Supprimer</button>
                     </div>
                 </div>
             </div>
@@ -50,4 +53,49 @@
         </div>
     </div>
 </div>
+
+<script>
+    function removeTrackFromCollection(collectionId, trackId, button) {
+        if (!confirm('Voulez-vous vraiment supprimer ce trail de la collection ?')) {
+            return;
+        }
+
+        fetch(`/api/collections/${collectionId}/tracks/${trackId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json().then(data => ({ status: response.status, body: data })))
+            .then(result => {
+                if (result.status === 200) {
+                    const card = button.closest('.collection-card');
+                    if (card) {
+                        card.remove();
+                    }
+
+                    const countElem = document.getElementById('collectionTrackCount');
+                    if (countElem) {
+                        const count = parseInt(countElem.textContent || '0', 10) - 1;
+                        countElem.textContent = Math.max(count, 0);
+                    }
+
+                    const remainingCards = document.querySelectorAll('.collections-grid .collection-card');
+                    if (remainingCards.length === 0) {
+                        const grid = document.querySelector('.collections-grid');
+                        if (grid) {
+                            grid.innerHTML = '<div class="activity-card" style="padding: 2rem; text-align: center;"><p>Aucun trail n\'a encore été ajouté à cette collection.</p></div>';
+                        }
+                    }
+                } else {
+                    throw new Error(result.body.error || 'Impossible de supprimer le trail');
+                }
+            })
+            .catch(error => {
+                console.error('Error removing track from collection:', error);
+                alert('Impossible de supprimer ce trail de la collection.');
+            });
+    }
+</script>
+
 {% endblock %}

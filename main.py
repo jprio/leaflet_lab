@@ -512,7 +512,7 @@ def create_collection():
             user_session.commit()
         pic_url = requests.get(
             f"https://api.unsplash.com/photos/random/?query={data['name']}&client_id=Y1Ri-AxBBUpySRvlADwGX-CTWCY9yZv0mJ3peT2_2VE").json()
-
+        print(f"pic url : {pic_url} for {data['name']}")
         # Create new collection
         new_collection = Collection(
             name=data['name'],
@@ -613,6 +613,39 @@ def add_track_to_collection(collection_id):
         print(f"Error adding track to collection: {e}")
         print(traceback.format_exc())
         return jsonify({'error': 'Failed to add trail to collection'}), 500
+
+
+@app.route('/api/collections/<int:collection_id>/tracks/<int:track_id>', methods=['DELETE'])
+def remove_track_from_collection(collection_id, track_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        collection = db.session.query(Collection).filter_by(
+            id=collection_id, user_id=current_user.id).first()
+        if not collection:
+            return jsonify({'error': 'Collection not found'}), 404
+
+        track = db.session.query(GPXTrack).filter_by(id=track_id).first()
+        if not track:
+            return jsonify({'error': 'Trail not found'}), 404
+
+        if track not in collection.tracks:
+            return jsonify({'error': 'Trail not in collection'}), 404
+
+        collection.tracks.remove(track)
+        db.session.commit()
+
+        return jsonify({'message': 'Trail removed from collection successfully'}), 200
+    except Exception as e:
+        print(f"Error removing track from collection: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': 'Failed to remove trail from collection'}), 500
 
 
 @app.route('/collection/<int:collection_id>')
