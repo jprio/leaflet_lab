@@ -19,7 +19,7 @@
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     <link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/ui-lightness/jquery-ui.css" rel="stylesheet"
         type="text/css" />
-    
+
     <!-- Vercel Speed Insights -->
     <script>
         window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
@@ -69,28 +69,28 @@
                     <a href="#">About Us</a>
                     <a href="#">Careers</a>
                     <a href="#">Press</a>
-                    <a href="#">Blog</a>
+                    <!-- <a href="#">Blog</a> -->
                 </div>
                 <div class="footer-section">
                     <h4>Explore</h4>
                     <a href="#">Trail Maps</a>
                     <a href="#">Guides</a>
                     <a href="#">Collections</a>
-                    <a href="#">Expert Reviews</a>
+                    <!-- <a href="#">Expert Reviews</a> -->
                 </div>
                 <div class="footer-section">
                     <h4>Community</h4>
                     <a href="#">Write a Review</a>
                     <a href="#">Add a Trail</a>
                     <a href="#">Photos</a>
-                    <a href="#">Forums</a>
+                    <!-- <a href="#">Forums</a> -->
                 </div>
                 <div class="footer-section">
                     <h4>Support</h4>
                     <a href="#">Help Center</a>
                     <a href="#">Contact Us</a>
                     <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
+                    <!-- <a href="#">Terms of Service</a> -->
                 </div>
             </div>
             <div class="footer-bottom">
@@ -98,20 +98,7 @@
             </div>
         </footer>
 
-        <script>
-            // Initialize map
-
-            // var map_detail = L.map('map_detail').setView([39.7392, -104.9903], 10);
-
-            // L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            //     attribution: '© OpenStreetMap contributors'
-            // }).addTo(map_detail);
-
-            // { { leaflet.render_map(map_detail, class_ = 'h-[200px]', zoom = 10) } }
-            // { { map_detail | safe } }
-
-        </script>
-        <script>
+        <!-- <script>
             // Full list options at "leaflet-elevation.js"
             var elevation_options = {
 
@@ -119,7 +106,7 @@
                 theme: "lightblue-theme",
 
                 // Chart container outside/inside map container
-                detached: true,
+                detached: false,
 
                 // if (detached), the elevation chart container
                 // elevationDiv: "#elevation-div",
@@ -213,28 +200,18 @@
                 preferCanvas: true,
 
             };
+ -->
+        // Instantiate map (leaflet-ui).
+        // var map = L.map('map_detail', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
+        // var map2 = L.map('ma_carte_unique123', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
 
-            // Instantiate map (leaflet-ui).
-            var map = L.map('map_detail', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
-            // var map2 = L.map('ma_carte_unique123', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
+        // Instantiate elevation control.
+        // var controlElevation = L.control.elevation(elevation_options).addTo(map);
+        // var controlElevation2 = L.control.elevation(elevation_options).addTo(map2);
 
-            // Instantiate elevation control.
-            var controlElevation = L.control.elevation(elevation_options).addTo(map);
-            // var controlElevation2 = L.control.elevation(elevation_options).addTo(map2);
+        // Rendre controlElevation accessible globalement
+        // window.controlElevation = controlElevation;
 
-            // Rendre controlElevation accessible globalement
-            window.controlElevation = controlElevation;
-
-            // Données GeoJSON des tracks depuis le backend
-            // { { geojson_data | safe } };
-
-            // // Créer les variables de données pour chaque track
-            // for (var trackId in geojsonData) {
-            //     window[trackId + '_data'] = geojsonData[trackId];
-            // }
-
-            // Load track from url (allowed data types: "*.geojson", "*.gpx", "*.tcx")
-            // controlElevation.load("https://raruto.github.io/leaflet-elevation/examples/via-emilia.gpx");
 
         </script>
 </body>

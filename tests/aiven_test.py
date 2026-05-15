@@ -229,8 +229,21 @@ def geopandas_search_test():
     AND ST_Y(ST_StartPoint(geom)) BETWEEN 41.95029860413911 AND 42.56016134191609
     """
 
-    gdf = gpd.read_postgis(sql2, engine, geom_col='geom')
-    print(gdf.shape)
+    gdf_tracks = gpd.read_postgis(sql2, engine, geom_col='geom')
+    gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
+        '%Y-%m-%d %H:%M:%S')
+    gdf_tracks['duration'] = 0
+    try:
+        gdf_tracks['duration'] = (
+            gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+        gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+            '%Y-%m-%d %H:%M:%S')
+        gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
+            '%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        print(f"Error formatting start_time or end_time: {e}")
+
+    print(gdf_tracks.to_json())
 
 
 # pandas_read_postgis_to_geojson()

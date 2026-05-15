@@ -275,6 +275,23 @@ def alltrail():
     )
 
 
+@app.route('/alltrail2')
+def alltrail2():
+    db_session = db.session
+    with db_session.connection() as conn:
+        user_collections = []
+        if 'user' in session:
+            current_user = db.session.query(User).filter_by(
+                uuid=session['user'].get('sub')).first()
+            if current_user:
+                user_collections = current_user.collections
+
+    db_session.close()
+
+    return render_template(
+        'trails2.html', user_collections=user_collections)
+
+
 @app.route("/find_tracks")
 def find_tracks():
     NW_lat = request.args.get('NW_lat')
@@ -314,7 +331,7 @@ def find_tracks():
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
         gdf_tracks['comment'].str.replace('\r\n', '<br>')
-
+        # print(gdf_tracks['name'])
         return gdf_tracks.to_json()
 
 
