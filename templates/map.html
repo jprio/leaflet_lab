@@ -71,13 +71,6 @@
 <script>selectTrail = function (trail) {
         // Logique pour récupérer les détails du trail sélectionné
         console.log("Trail selected: " + trail);
-        // Mettre à jour la section des détails du trail avec les informations correspondantes
-        // document.getElementById("trail-info").innerHTML = "<h3>" + trail + "</h3><p>Detailed information about the trail will be displayed here.</p>";
-        // document.getElementById("map_detail").innerHTML = "<p>Map and elevation profile for " + trail + " will be displayed here.</p>";
-
-        // window.controlElevation.load("https://raruto.github.io/leaflet-elevation/examples/via-emilia.gpx");
-        // window.controlElevation.clear();
-        // window.controlElevation.addData(trail.geom);
 
     }</script>
 <main class="main-content">
@@ -190,13 +183,13 @@
                 trailLayerMap = {};
                 trailItemCounter = 0;
 
-                fetch('find_tracks?NW_lon=' + NW_lon + '&SE_lon=' + SE_lon + '&NW_lat=' + NW_lat + '&SE_lat=' + SE_lat)
+                fetch('/api/find_tracks?NW_lon=' + NW_lon + '&SE_lon=' + SE_lon + '&NW_lat=' + NW_lat + '&SE_lat=' + SE_lat)
                     .then(function (response) { return response.json(); })
                     .then(function (data) {
                         trailsGeoJsonLayer = L.geoJSON(data, {
                             style: function (feature) {
                                 switch (feature.properties.type) {
-                                    case 'HIKE': return { color: "#ff0000", opacity: 0.5, weight: 4 };
+                                    case 'HIKE': return { color: "green", opacity: 0.5, weight: 4 };
                                     case 'OFFROAD': return { color: "#0000ff", opacity: 0.5, weight: 4 };
                                     default: return { color: "#888888", opacity: 0.5, weight: 4 };
                                 }
@@ -300,7 +293,6 @@
                 // console.log("NW Lng: " + northWest.lng);
                 // console.log("SE Lat: " + southEast.lat);
                 // console.log("SE Lng: " + southEast.lng);
-                fetch_and_draw_data({ NW_lat: northWest.lat, NW_lon: northWest.lng, SE_lat: southEast.lat, SE_lon: southEast.lng, fitbounds: false });
 
                 // Get current URL and create URL object
                 const url = new URL(window.location.href);
@@ -319,6 +311,7 @@
 
                 // Update the browser URL without reload
                 window.history.replaceState({}, document.title, url.toString());
+                fetch_and_draw_data({ NW_lat: northWest.lat, NW_lon: northWest.lng, SE_lat: southEast.lat, SE_lon: southEast.lng, fitbounds: false });
             });
 
         </script>
@@ -344,8 +337,8 @@
                 attribution: '© OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team hosted by OpenStreetMap France'
             }).addTo(map2);
 
-            const Cartodb_Positron = L.tileLayer('Cartodb Positron', {
-                maxZoom: 19,
+            const cartodb_positron = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
             }).addTo(map2);
 
             const gmaps_routes = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -368,7 +361,7 @@
                 "OpenStreetMap": osm,
                 "OpenStreetMap.HOT": osmHOT,
                 "OpenTopoMap": opentopomap,
-                "Cartodb Positron": Cartodb_Positron,
+                "Cartodb Positron": cartodb_positron,
                 "Google Maps Routes": gmaps_routes,
                 "Google Maps Sat": gmaps_sat,
                 "Google Maps Terrain": gmaps_terrain,

@@ -38,7 +38,7 @@
                     <p>{{ track.comment or 'Aucun commentaire disponible.' }}</p>
                     <div class="collection-actions"
                         style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <a href="/alltrail" class="btn-primary">Voir sur la carte</a>
+                        <a href="/explore/map" class="btn-primary">Voir sur la carte</a>
                         <button type="button" class="btn-secondary"
                             onclick="event.stopPropagation(); removeTrackFromCollection({{ collection.id }}, {{ track.id }}, this)">Supprimer</button>
                     </div>

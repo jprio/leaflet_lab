@@ -48,7 +48,6 @@
                             <img src="{{ session['user']['picture'] }}" width="40" height="40"
                                 alt="{{ session['user']['email'] }}" /></a>
                         <br>
-                        <a href="/auth/logout">Logout</a>
                     </span>
                     {% else %}
                     <a href="/auth/login">Login</a>
@@ -200,20 +199,10 @@
                 preferCanvas: true,
 
             };
- -->
-        // Instantiate map (leaflet-ui).
-        // var map = L.map('map_detail', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
-        // var map2 = L.map('ma_carte_unique123', { mapTypeId: 'terrain', center: [41.4583, 12.7059], zoom: 5 });
-
-        // Instantiate elevation control.
-        // var controlElevation = L.control.elevation(elevation_options).addTo(map);
-        // var controlElevation2 = L.control.elevation(elevation_options).addTo(map2);
-
-        // Rendre controlElevation accessible globalement
-        // window.controlElevation = controlElevation;
-
-
+            
+            
         </script>
+        -->
 </body>
 
 </html>
