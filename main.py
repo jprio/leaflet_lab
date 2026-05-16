@@ -1,4 +1,4 @@
-from app.models.db import db
+from app.models.domain import db
 from flask import Flask, render_template, make_response, redirect, request, session, g, flash, url_for, Blueprint, jsonify
 from flask_cors import CORS, cross_origin
 import folium
@@ -17,7 +17,7 @@ import pandas as pd
 from sqlalchemy.orm import sessionmaker
 from geoalchemy2 import Geometry, WKTElement
 from shapely.geometry import LineString
-from app.models.domain import Base, User, Collection, GPXTrack
+from app.models.domain import Base, User, Collection, GPXTrack, TravelWish
 import app.models .persistence as persistence
 import geopandas as gpd
 from geoalchemy2.shape import to_shape
@@ -70,43 +70,6 @@ with app.app_context():
 def index():
     # return redirect("/alltrail")
     return render_template("index.html")
-
-
-@app.route("/folium")
-def folium_map():
-    import geopandas as gpd
-    import folium
-    from geojson_length import calculate_distance, Unit
-    engine = persistence.get_engine()
-    gdf = gpd.read_postgis(
-        "SELECT name, geom FROM gpx_tracks", con=engine, geom_col='geom')
-
-    # S'assurer que le CRS est EPSG:4326
-    if gdf.crs.to_string() != 'EPSG:4326':
-        gdf = gdf.to_crs('EPSG:4326')
-
-    # 2. Créer la carte avec Folium
-    # On centre la carte sur la moyenne des coordonnées
-    m = folium.Map(location=[gdf.geometry.centroid.y.mean(
-    ), gdf.geometry.centroid.x.mean()], zoom_start=10)
-
-    for idx, row in gdf.iterrows():
-        geom = row['geom']
-        name = row['name']
-        print(f"Processing track: {name}, Geometry type: {geom.geom_type}")
-        # Ajouter les données géographiques sous forme de GeoJSON
-        if geom.geom_type == 'LineString':
-            # folium.PolyLine(locations=[(point.y, point.x) for point in geom.coords], color='blue', weight=5, opacity=0.7, tooltip=name).add_to(m)
-            # line = Feature(geometry=geom, properties={"name": name})
-            tooltip = name + '<br>' + f"Length: {geom.length:.2f} km" + ' <br>   ' + str(
-                calculate_distance(geom, Unit.kilometers)*100) + f"Type: {geom.geom_type}"
-            folium.GeoJson(geom, tooltip=folium.Tooltip(
-                text=tooltip), color='red').add_to(m)
-        elif geom.geom_type == 'Point':
-            folium.Marker(location=(geom.y, geom.x), tooltip=name).add_to(m)
-
-    # 3. Rendre la carte HTML dans Flask
-    return render_template('folium.html', map=m._repr_html_())
 
 
 def allowed_file(filename):
@@ -216,6 +179,21 @@ def autocomplete():
     return jsonify(results=results)
 
 
+@app.route('/collection2/<int:collection_id>')
+def view_collection2(collection_id):
+    if 'user' not in session:
+        return redirect(url_for('auth.login'))
+
+    db_session = db.session
+    current_user = db.session.query(User).filter_by(
+        uuid=session['user'].get('sub')).first()
+    if not current_user:
+        return redirect(url_for('auth.login'))
+
+    db_session.close()
+    return render_template('collection2.html')
+
+
 @app.route('/collection/<int:collection_id>')
 def view_collection(collection_id):
     if 'user' not in session:
@@ -239,8 +217,8 @@ def view_collection(collection_id):
         sql = f"SELECT t.* FROM gpx_tracks t JOIN collection_track ct ON ct.track_id = t.id WHERE ct.collection_id = {collection_id}"
         gdf_tracks = gpd.GeoDataFrame.from_postgis(
             sql, con=conn, geom_col='geom')
-        print(gdf_tracks.head())
-        print(gdf_tracks['insert_date'].head())
+        # print(gdf_tracks.head())
+        # print(gdf_tracks['insert_date'].head())
         if len(gdf_tracks) == 0:
             m = folium.Map(location=[0, 0],
                            zoom_start=2, tiles='OpenStreetMap')
@@ -305,6 +283,151 @@ def view_collection(collection_id):
 
     db_session.close()
     return render_template('collection.html', collection=collection, script_map=m.get_root()._repr_html_())
+
+
+# ======================== TRAVEL WISHES ROUTES ========================
+
+@app.route('/travel-wishes')
+def travel_wishes():
+    if 'user' not in session:
+        return redirect(url_for('auth.login'))
+
+    current_user = db.session.query(User).filter_by(
+        uuid=session['user'].get('sub')).first()
+    if not current_user:
+        return redirect(url_for('auth.login'))
+
+    wishes = db.session.query(TravelWish).filter_by(
+        user_id=current_user.id).all()
+    return render_template('travel_wishes.html', wishes=wishes)
+
+
+@app.route('/api/travel-wishes', methods=['POST'])
+def create_travel_wish():
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        title = data.get('title')
+        description = data.get('description')
+        region = data.get('region')
+
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        new_wish = TravelWish(
+            title=title,
+            description=description,
+            region=region,
+            user_id=current_user.id
+        )
+        db.session.add(new_wish)
+        db.session.commit()
+
+        return jsonify({
+            'id': new_wish.id,
+            'title': new_wish.title,
+            'description': new_wish.description,
+            'region': new_wish.region
+        }), 201
+    except Exception as e:
+        print(f"Error creating travel wish: {e}")
+        return jsonify({'error': 'Failed to create travel wish'}), 500
+
+
+@app.route('/api/travel-wishes/<int:wish_id>', methods=['GET'])
+def get_travel_wish(wish_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        wish = db.session.query(TravelWish).filter_by(
+            id=wish_id, user_id=current_user.id).first()
+        if not wish:
+            return jsonify({'error': 'Wish not found'}), 404
+
+        return jsonify({
+            'id': wish.id,
+            'title': wish.title,
+            'description': wish.description,
+            'region': wish.region
+        }), 200
+    except Exception as e:
+        print(f"Error getting travel wish: {e}")
+        return jsonify({'error': 'Failed to get travel wish'}), 500
+
+
+@app.route('/api/travel-wishes/<int:wish_id>', methods=['PUT'])
+def update_travel_wish(wish_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        wish = db.session.query(TravelWish).filter_by(
+            id=wish_id, user_id=current_user.id).first()
+        if not wish:
+            return jsonify({'error': 'Wish not found'}), 404
+
+        if 'title' in data:
+            wish.title = data['title']
+        if 'description' in data:
+            wish.description = data['description']
+        if 'region' in data:
+            wish.region = data['region']
+
+        db.session.commit()
+
+        return jsonify({
+            'id': wish.id,
+            'title': wish.title,
+            'description': wish.description,
+            'region': wish.region
+        }), 200
+    except Exception as e:
+        print(f"Error updating travel wish: {e}")
+        return jsonify({'error': 'Failed to update travel wish'}), 500
+
+
+@app.route('/api/travel-wishes/<int:wish_id>', methods=['DELETE'])
+def delete_travel_wish(wish_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        wish = db.session.query(TravelWish).filter_by(
+            id=wish_id, user_id=current_user.id).first()
+        if not wish:
+            return jsonify({'error': 'Wish not found'}), 404
+
+        db.session.delete(wish)
+        db.session.commit()
+
+        return jsonify({'message': 'Travel wish deleted successfully'}), 200
+    except Exception as e:
+        print(f"Error deleting travel wish: {e}")
+        return jsonify({'error': 'Failed to delete travel wish'}), 500
 
 
 if __name__ == "__main__":

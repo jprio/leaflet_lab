@@ -1,3 +1,4 @@
+from dataclasses import dataclass, asdict
 import requests
 import traceback
 from flask import jsonify
@@ -6,7 +7,7 @@ from flask import (
     Blueprint, request, g, redirect, url_for, flash, render_template, session
 )
 import json
-from app.models.db import db
+from app.models.domain import db
 from app.models.domain import User, Collection, GPXTrack
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -103,6 +104,92 @@ def create_collection():
         print(traceback.format_exc())
 
         return jsonify({'error': 'Failed to create collection'}), 500
+
+
+@bp.route('/collections/info/<int:collection_id>', methods=['GET'])
+def get_collection_infos(collection_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        # Get user ID from database
+        user_session = db.session
+        user = user_session.query(User).filter_by(
+            name=session['user']['name']).first()
+
+        if not user:
+            user_session.close()
+            return jsonify({'error': 'User not found'}), 404
+
+        # Find the collection
+        collection = user_session.query(Collection).filter_by(
+            id=collection_id,
+            user_id=user.id
+        ).first()
+        if not collection:
+            user_session.close()
+            return jsonify({'error': 'Collection not found'}), 404
+
+        print(collection)
+        return jsonify({'name': collection.name, 'pic_url': collection.pic_url, 'description': collection.description})
+
+    except Exception as e:
+        print(f"Error fetching collection: {e}")
+        return jsonify({'error': 'Failed to fetch collection'}), 500
+
+
+@bp.route('/collection_tracks/<int:collection_id>', methods=['GET'])
+def get_collection_tracks(collection_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        # Get user ID from database
+        user_session = db.session
+        user = user_session.query(User).filter_by(
+            name=session['user']['name']).first()
+
+        if not user:
+            user_session.close()
+            return jsonify({'error': 'User not found'}), 404
+
+        # Find the collection
+        collection = user_session.query(Collection).filter_by(
+            id=collection_id,
+            user_id=user.id
+        ).first()
+        if not collection:
+            user_session.close()
+            return jsonify({'error': 'Collection not found'}), 404
+        sql = f"SELECT t.* FROM gpx_tracks t JOIN collection_track ct ON ct.track_id = t.id WHERE ct.collection_id = {collection_id}"
+        gdf_tracks = gpd.GeoDataFrame.from_postgis(
+            sql, con=user_session.connection(), geom_col='geom')
+        if gdf_tracks.empty:
+            return gdf_tracks.to_json()
+
+        try:
+            gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+            gdf_tracks['duration'] = 0
+            gdf_tracks['duration'] = (
+                gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+            gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+            gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            print(f"Error formatting start_time or end_time: {e}")
+        gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
+        gdf_tracks['link'] = gdf_tracks['link'].fillna('')
+        gdf_tracks['comment'].str.replace('\r\n', '<br>')
+
+        user_session.commit()
+        user_session.close()
+        return gdf_tracks.to_json(), 200
+
+    except Exception as e:
+        print(f"Error fetching collection: {e}")
+        return jsonify({'error': 'Failed to fetch collection'}), 500
 
 
 @bp.route('/collections/<int:collection_id>', methods=['DELETE'])

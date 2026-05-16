@@ -246,10 +246,25 @@ def geopandas_search_test():
     print(gdf_tracks.to_json())
 
 
+def pandas_get_collection():
+    engine = get_engine()
+    collection_id = 15
+    sql = f"""
+        SELECT t.* FROM gpx_tracks t JOIN collection_track ct ON ct.track_id = t.id WHERE ct.collection_id = {collection_id}
+    """
+
+    gdf = gpd.read_postgis(
+        sql, con=engine, geom_col='geom')
+    print(gdf.head())
+    # gdf.to_file("gpx_tracks.geojson", driver='GeoJSON')
+    print(gdf.shape)
+
+
 # pandas_read_postgis_to_geojson()
 # test_postgis_to_geojson()
 # test_save_gpx()
 # alchemy_test()
 # alchemy_test_mean_location()
 # alchemy_test_relationship()
-geopandas_search_test()
+# geopandas_search_test()
+pandas_get_collection()

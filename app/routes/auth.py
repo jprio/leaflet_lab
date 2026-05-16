@@ -5,7 +5,7 @@ import os
 import requests
 from oauthlib import oauth2
 import json
-from app.models.db import db
+from app.models.domain import db
 from app.models.domain import User, Collection
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 DATA = {

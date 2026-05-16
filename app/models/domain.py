@@ -17,6 +17,8 @@ from sqlalchemy.orm import attributes
 from geoalchemy2.shape import to_shape
 from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import JSON
+from dataclasses import dataclass, asdict
+from flask_sqlalchemy import SQLAlchemy
 
 
 class Base(DeclarativeBase):
@@ -26,6 +28,10 @@ class Base(DeclarativeBase):
         pass
 
 
+db = SQLAlchemy(model_class=Base)
+
+
+@dataclass
 class User(Base):
     __tablename__ = "user_account"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -37,6 +43,9 @@ class User(Base):
     collections: Mapped[List["Collection"]] = relationship("Collection",
                                                            back_populates="user", cascade="all, delete-orphan"
                                                            )
+    travel_wishes: Mapped[List["TravelWish"]] = relationship("TravelWish",
+                                                             back_populates="user", cascade="all, delete-orphan"
+                                                             )
 
     def __repr__(self) -> str:
         return f"User(id={self.id!r}, name={self.name!r}, email={self.email!r}, collections={self.collections!r})"
@@ -50,6 +59,7 @@ collection_track = Table(
 )
 
 
+@dataclass
 class Collection(Base):
     __tablename__ = "collection"
     # id: Mapped[int] = mapped_column(primary_key=True, )
@@ -96,6 +106,22 @@ class GPXTrack(Base):
     # length: int
     def __repr__(self) -> str:
         return f"GPXTrack(id={self.id!r}, name={self.name!r})"
+
+
+class TravelWish(Base):
+    __tablename__ = 'travel_wishes'
+    id = Column(Integer, Identity(start=1), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[Optional[str]] = mapped_column(String(1000))
+    region: Mapped[Optional[str]] = mapped_column(String(255))
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
+    user: Mapped["User"] = relationship("User", back_populates="travel_wishes")
+    created_at: Column[datetime] = Column(DateTime, server_default=func.now())
+    updated_at: Column[datetime] = Column(
+        DateTime, server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self) -> str:
+        return f"TravelWish(id={self.id!r}, title={self.title!r}, region={self.region!r})"
 
 # @event.listens_for(GPXTrack, 'before_commit')
 # def gpxtrack_before_commit(session, instance):
