@@ -165,7 +165,7 @@ def upload_file():
         for route in gpx.routes:
             print('Route:')
 
-        return redirect("/alltrail")
+        return redirect("/explore/map")
 
 
 @app.route('/search', methods=['GET'])
