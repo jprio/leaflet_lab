@@ -438,8 +438,6 @@ def get_waypoints():
     if 'user' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
-    return jsonify({'error': 'Failed to get waypoints'}), 500
-
     try:
         current_user = db.session.query(User).filter_by(
             uuid=session['user'].get('sub')).first()
