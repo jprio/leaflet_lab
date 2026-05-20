@@ -374,6 +374,60 @@
 
 </main>
 
+<!-- Waypoint Creation Modal -->
+<div id="createWaypointModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Nouveau waypoint</h3>
+            <span class="close" onclick="closeCreateWaypointModal()">&times;</span>
+        </div>
+        <form id="createWaypointForm" onsubmit="submitCreateWaypoint(event)">
+            <div class="form-group">
+                <label for="waypointCoords">Coordonnées</label>
+                <input type="text" id="waypointCoords" disabled>
+            </div>
+            <div class="form-group">
+                <label for="waypointDescription">Description</label>
+                <textarea id="waypointDescription" name="description" rows="3"
+                    placeholder="Décrivez ce waypoint..."></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeCreateWaypointModal()">Annuler</button>
+                <button type="submit" class="btn-primary">Créer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Waypoint Collection Modal -->
+<div id="addWaypointToCollectionModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Ajouter un waypoint à une collection</h3>
+            <span class="close" onclick="closeAddWaypointToCollectionModal()">&times;</span>
+        </div>
+        <form id="addWaypointToCollectionForm" onsubmit="submitAddWaypointToCollection(event)">
+            <div class="form-group">
+                <label for="waypointCollectionSelect">Collection</label>
+                <select id="waypointCollectionSelect" name="collection_id" required>
+                    <option value="">Sélectionner une collection</option>
+                    {% for collection in user_collections %}
+                    <option value="{{ collection.id }}">{{ collection.name }}</option>
+                    {% endfor %}
+                </select>
+                {% if not user_collections %}
+                <p class="form-help">Vous n'avez pas encore de collection. Créez-en une depuis votre profil.</p>
+                {% endif %}
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary"
+                    onclick="closeAddWaypointToCollectionModal()">Annuler</button>
+                <button type="submit" class="btn-primary">Ajouter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div id="addToCollectionModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -456,11 +510,202 @@
     }
 
     window.onclick = function (event) {
-        const modal = document.getElementById('addToCollectionModal');
-        if (event.target == modal) {
+        const addToCollectionModal = document.getElementById('addToCollectionModal');
+        const createWaypointModal = document.getElementById('createWaypointModal');
+        const addWaypointToCollectionModal = document.getElementById('addWaypointToCollectionModal');
+
+        if (event.target == addToCollectionModal) {
             closeAddToCollectionModal();
         }
+        if (event.target == createWaypointModal) {
+            closeCreateWaypointModal();
+        }
+        if (event.target == addWaypointToCollectionModal) {
+            closeAddWaypointToCollectionModal();
+        }
     }
+
+    // ======================== WAYPOINTS FUNCTIONALITY ========================
+
+    let pendingWaypoint = null;
+    let selectedWaypointId = null;
+    let waypointsLayer = null;
+    let waypointsMarkerMap = {};
+
+    function initWaypoints() {
+        waypointsLayer = L.featureGroup().addTo(map2);
+        loadWaypoints();
+        map2.on('click', function (e) {
+            showCreateWaypointModal(e.latlng.lat, e.latlng.lng);
+        });
+    }
+
+    function loadWaypoints() {
+        fetch('/api/waypoints')
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(waypoint => {
+                    addWaypointMarker(waypoint);
+                });
+            })
+            .catch(error => console.error('Error loading waypoints:', error));
+    }
+
+    function addWaypointMarker(waypoint) {
+        const marker = L.marker([waypoint.lat, waypoint.lng])
+            .bindPopup(`
+                <div style="max-width: 200px;">
+                    <p><strong>Description:</strong> ${waypoint.description || 'Aucune'}</p>
+                    <p><small>Créé: ${new Date(waypoint.created_at).toLocaleDateString()}</small></p>
+                    <button class="btn-secondary" onclick="editWaypoint(${waypoint.id})">Éditer</button>
+                    <button class="btn-secondary" onclick="deleteWaypoint(${waypoint.id})">Supprimer</button>
+                    <button class="btn-primary" onclick="openAddWaypointToCollectionModal(${waypoint.id})">Ajouter à collection</button>
+                </div>
+            `)
+            .addTo(waypointsLayer);
+
+        waypointsMarkerMap[waypoint.id] = marker;
+    }
+
+    function showCreateWaypointModal(lat, lng) {
+        pendingWaypoint = { lat: lat, lng: lng };
+        document.getElementById('waypointCoords').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        document.getElementById('waypointDescription').value = '';
+        document.getElementById('createWaypointModal').style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCreateWaypointModal() {
+        pendingWaypoint = null;
+        document.getElementById('createWaypointModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    function submitCreateWaypoint(event) {
+        event.preventDefault();
+
+        if (!pendingWaypoint) {
+            alert('Erreur: coordonnées manquantes');
+            return;
+        }
+
+        const description = document.getElementById('waypointDescription').value;
+
+        fetch('/api/waypoints', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                lat: pendingWaypoint.lat,
+                lng: pendingWaypoint.lng,
+                description: description
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.error || 'Erreur'); });
+                }
+                return response.json();
+            })
+            .then(waypoint => {
+                addWaypointMarker(waypoint);
+                alert('Waypoint créé avec succès!');
+                closeCreateWaypointModal();
+            })
+            .catch(error => {
+                console.error('Error creating waypoint:', error);
+                alert('Erreur lors de la création du waypoint.');
+            });
+    }
+
+    function editWaypoint(waypointId) {
+        alert('Édition non implémentée pour le moment');
+    }
+
+    function deleteWaypoint(waypointId) {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer ce waypoint?')) {
+            return;
+        }
+
+        fetch(`/api/waypoints/${waypointId}`, {
+            method: 'DELETE'
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.error || 'Erreur'); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                const marker = waypointsMarkerMap[waypointId];
+                if (marker) {
+                    waypointsLayer.removeLayer(marker);
+                    delete waypointsMarkerMap[waypointId];
+                }
+                alert('Waypoint supprimé avec succès!');
+            })
+            .catch(error => {
+                console.error('Error deleting waypoint:', error);
+                alert('Erreur lors de la suppression du waypoint.');
+            });
+    }
+
+    function openAddWaypointToCollectionModal(waypointId) {
+        selectedWaypointId = waypointId;
+        document.getElementById('waypointCollectionSelect').selectedIndex = 0;
+        document.getElementById('addWaypointToCollectionModal').style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeAddWaypointToCollectionModal() {
+        selectedWaypointId = null;
+        document.getElementById('addWaypointToCollectionModal').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+
+    function submitAddWaypointToCollection(event) {
+        event.preventDefault();
+
+        if (!selectedWaypointId) {
+            alert('Erreur: waypoint non sélectionné');
+            return;
+        }
+
+        const collectionId = document.getElementById('waypointCollectionSelect').value;
+        if (!collectionId) {
+            alert('Veuillez sélectionner une collection.');
+            return;
+        }
+
+        fetch(`/api/waypoints/${selectedWaypointId}/add-to-collection/${collectionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.error || 'Erreur'); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('Waypoint ajouté à la collection avec succès!');
+                closeAddWaypointToCollectionModal();
+            })
+            .catch(error => {
+                console.error('Error adding waypoint to collection:', error);
+                alert('Erreur lors de l\'ajout du waypoint à la collection.');
+            });
+    }
+
+    // Initialize waypoints after map is loaded
+    setTimeout(function () {
+        if (map2) {
+            initWaypoints();
+        }
+    }, 500);
 </script>
 
 {% endblock %}

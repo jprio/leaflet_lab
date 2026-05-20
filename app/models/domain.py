@@ -46,6 +46,9 @@ class User(Base):
     travel_wishes: Mapped[List["TravelWish"]] = relationship("TravelWish",
                                                              back_populates="user", cascade="all, delete-orphan"
                                                              )
+    waypoints: Mapped[List["Waypoint"]] = relationship("Waypoint",
+                                                       back_populates="user", cascade="all, delete-orphan"
+                                                       )
 
     def __repr__(self) -> str:
         return f"User(id={self.id!r}, name={self.name!r}, email={self.email!r}, collections={self.collections!r})"
@@ -56,6 +59,13 @@ collection_track = Table(
     Base.metadata,
     Column("collection_id", ForeignKey("collection.id"), primary_key=True),
     Column("track_id", ForeignKey("gpx_tracks.id"), primary_key=True),
+)
+
+collection_waypoint = Table(
+    "collection_waypoint",
+    Base.metadata,
+    Column("collection_id", ForeignKey("collection.id"), primary_key=True),
+    Column("waypoint_id", ForeignKey("waypoints.id"), primary_key=True),
 )
 
 
@@ -72,6 +82,11 @@ class Collection(Base):
     tracks: Mapped[List["GPXTrack"]] = relationship(
         "GPXTrack",
         secondary=collection_track,
+        back_populates="collections"
+    )
+    waypoints: Mapped[List["Waypoint"]] = relationship(
+        "Waypoint",
+        secondary=collection_waypoint,
         back_populates="collections"
     )
 
@@ -122,6 +137,26 @@ class TravelWish(Base):
 
     def __repr__(self) -> str:
         return f"TravelWish(id={self.id!r}, title={self.title!r}, region={self.region!r})"
+
+
+class Waypoint(Base):
+    __tablename__ = 'waypoints'
+    id = Column(Integer, Identity(start=1), primary_key=True)
+    description: Mapped[Optional[str]] = mapped_column(String(1000))
+    user_id: Mapped[int] = mapped_column(ForeignKey("user_account.id"))
+    user: Mapped["User"] = relationship("User", back_populates="waypoints")
+    geom = Column(Geometry(geometry_type='POINT', srid=4326))
+    created_at: Column[datetime] = Column(DateTime, server_default=func.now())
+    updated_at: Column[datetime] = Column(
+        DateTime, server_default=func.now(), onupdate=func.now())
+    collections: Mapped[List["Collection"]] = relationship(
+        "Collection",
+        secondary=collection_waypoint,
+        back_populates="waypoints"
+    )
+
+    def __repr__(self) -> str:
+        return f"Waypoint(id={self.id!r}, description={self.description!r})"
 
 # @event.listens_for(GPXTrack, 'before_commit')
 # def gpxtrack_before_commit(session, instance):

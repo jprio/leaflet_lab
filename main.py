@@ -16,8 +16,8 @@ import gpxpy
 import pandas as pd
 from sqlalchemy.orm import sessionmaker
 from geoalchemy2 import Geometry, WKTElement
-from shapely.geometry import LineString
-from app.models.domain import Base, User, Collection, GPXTrack, TravelWish
+from shapely.geometry import LineString, Point
+from app.models.domain import Base, User, Collection, GPXTrack, TravelWish, Waypoint
 import app.models .persistence as persistence
 import geopandas as gpd
 from geoalchemy2.shape import to_shape
@@ -64,6 +64,7 @@ def create_app():
 app = create_app()
 with app.app_context():
     db.create_all()
+print("app created")
 
 
 @app.route("/")
@@ -430,5 +431,200 @@ def delete_travel_wish(wish_id):
         return jsonify({'error': 'Failed to delete travel wish'}), 500
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+# ======================== WAYPOINTS ROUTES ========================
+
+@app.route('/api/waypoints', methods=['GET'])
+def get_waypoints():
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoints = db.session.query(Waypoint).filter_by(
+            user_id=current_user.id).all()
+
+        waypoints_data = []
+        for wp in waypoints:
+            shapely_point = to_shape(wp.geom)
+            waypoints_data.append({
+                'id': wp.id,
+                'description': wp.description,
+                'lat': shapely_point.y,
+                'lng': shapely_point.x,
+                'created_at': wp.created_at.isoformat() if wp.created_at else None
+            })
+
+        return jsonify(waypoints_data), 200
+    except Exception as e:
+        print(f"Error getting waypoints: {e}")
+        return jsonify({'error': 'Failed to get waypoints'}), 500
+
+
+@app.route('/api/waypoints', methods=['POST'])
+def create_waypoint():
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        lat = data.get('lat')
+        lng = data.get('lng')
+        description = data.get('description', '')
+
+        if lat is None or lng is None:
+            return jsonify({'error': 'Latitude and longitude are required'}), 400
+
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Create point geometry
+        point = Point(lng, lat)
+        wkt = point.wkt
+
+        new_waypoint = Waypoint(
+            description=description,
+            user_id=current_user.id,
+            geom=WKTElement(wkt, srid=4326)
+        )
+        db.session.add(new_waypoint)
+        db.session.commit()
+
+        return jsonify({
+            'id': new_waypoint.id,
+            'description': new_waypoint.description,
+            'lat': lat,
+            'lng': lng,
+            'created_at': new_waypoint.created_at.isoformat() if new_waypoint.created_at else None
+        }), 201
+    except Exception as e:
+        print(f"Error creating waypoint: {e}")
+        return jsonify({'error': 'Failed to create waypoint'}), 500
+
+
+@app.route('/api/waypoints/<int:waypoint_id>', methods=['GET'])
+def get_waypoint(waypoint_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        shapely_point = to_shape(waypoint.geom)
+        return jsonify({
+            'id': waypoint.id,
+            'description': waypoint.description,
+            'lat': shapely_point.y,
+            'lng': shapely_point.x,
+            'created_at': waypoint.created_at.isoformat() if waypoint.created_at else None
+        }), 200
+    except Exception as e:
+        print(f"Error getting waypoint: {e}")
+        return jsonify({'error': 'Failed to get waypoint'}), 500
+
+
+@app.route('/api/waypoints/<int:waypoint_id>', methods=['PUT'])
+def update_waypoint(waypoint_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        if 'description' in data:
+            waypoint.description = data['description']
+
+        db.session.commit()
+
+        shapely_point = to_shape(waypoint.geom)
+        return jsonify({
+            'id': waypoint.id,
+            'description': waypoint.description,
+            'lat': shapely_point.y,
+            'lng': shapely_point.x,
+            'created_at': waypoint.created_at.isoformat() if waypoint.created_at else None
+        }), 200
+    except Exception as e:
+        print(f"Error updating waypoint: {e}")
+        return jsonify({'error': 'Failed to update waypoint'}), 500
+
+
+@app.route('/api/waypoints/<int:waypoint_id>', methods=['DELETE'])
+def delete_waypoint(waypoint_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        db.session.delete(waypoint)
+        db.session.commit()
+
+        return jsonify({'message': 'Waypoint deleted successfully'}), 200
+    except Exception as e:
+        print(f"Error deleting waypoint: {e}")
+        return jsonify({'error': 'Failed to delete waypoint'}), 500
+
+
+@app.route('/api/waypoints/<int:waypoint_id>/add-to-collection/<int:collection_id>', methods=['POST'])
+def add_waypoint_to_collection(waypoint_id, collection_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        collection = db.session.query(Collection).filter_by(
+            id=collection_id, user_id=current_user.id).first()
+        if not collection:
+            return jsonify({'error': 'Collection not found'}), 404
+
+        if waypoint not in collection.waypoints:
+            collection.waypoints.append(waypoint)
+            db.session.commit()
+
+        return jsonify({'message': 'Waypoint added to collection successfully'}), 200
+    except Exception as e:
+        print(f"Error adding waypoint to collection: {e}")
+        return jsonify({'error': 'Failed to add waypoint to collection'}), 500
+
+
+app.run(host="0.0.0.0", port=5000, debug=True)
