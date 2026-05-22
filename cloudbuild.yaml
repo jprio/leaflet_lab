@@ -18,7 +18,7 @@ steps:
       ]
 
   # 3. Déployer l'image sur Cloud Run
-  - name: "gcr.io/cloud-builders/docker"
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args:
       - "run"
