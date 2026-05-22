@@ -29,7 +29,7 @@
         <div class="collections-grid" id="collectionsGrid">
             {% for collection in user.collections %}
             <div class="collection-card" data-collection-id="{{ collection.id }}"
-                onclick="window.location.href='/collection2/{{ collection.id }}'">
+                onclick="window.location.href='/collection/{{ collection.id }}'">
                 <div class="collection-image">
                     <img src="{{ collection.pic_url}}" alt="{{ collection.name }}">
                 </div>

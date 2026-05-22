@@ -1,55 +1,356 @@
 {% extends "base.html" %}
 
 {% block content %}
+<script>
+    collectionId = window.location.pathname.split("/")[2]
+    fetch('/api/collections/info/' + collectionId)
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            console.log(data)
+            if (data) {
+                $(".profile-name").html(data.name)
+                $(".profile-bio").html(data.description)
+                $(".stat-card").css("background-image", "url(" + data.pic_url + ")");
+
+            }
+        }
+        );
+</script>
 <div class="profile-container">
-    <div class="profile-header" style="flex-wrap: wrap; gap: 1rem;">
+    <div class="profile-header" style="flex-wrap: wrap; gap:0.5rem;">
         <div>
             <a href="/auth/me" class="btn-secondary" style="margin-bottom: 1rem; display: inline-block;">← Retour au
                 profil</a>
-            <h1 class="profile-name">{{ collection.name }}</h1>
-            <p class="profile-bio">{{ collection.description or 'Aucune description pour cette collection.' }}</p>
+            <h1 class="profile-name"> collection.name </h1>
+            <p class="profile-bio">description</p>
         </div>
         <div style="margin-left: auto; text-align: right;">
             <div class="stat-card"
                 style="display: inline-flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem;">
                 <div class="stat-icon">📚</div>
                 <div class="stat-content">
-                    <div class="stat-number" id="collectionTrackCount">{{ collection.tracks | length }}</div>
+                    <div class="stat-number" id="collectionTrackCount"></div>
                     <div class="stat-label">Trails dans la collection</div>
                 </div>
             </div>
         </div>
     </div>
+    <style>
+        .content {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 0;
+            height: calc(70vh - 150px);
+        }
+    </style>
+    <main class="content">
+        <!-- Middle column - Map -->
+        <div id="map2" style="width: 100%; height: 100%;">
+            <script>
+                var trailsGeoJsonLayer = null;
+                var trailLayerMap = {};
+                var trailItemCounter = 0;
+                var elevation_options = {
+                    detached: false,
+                    autohide: false,
+                    theme: "lightblue-theme",
+                    height: 325,
+                    width: 500,
+                    slope: false,
 
-    <div class="map-container" style="margin: 2rem 0;">
-        {{ script_map | safe }}
-    </div>
+                };
+                var elevationControl = L.control.elevation(elevation_options);
+                var currFeature = null;
+
+                function highlightTrail(itemId) {
+                    const layer = trailLayerMap[itemId];
+                    if (!layer) {
+                        return;
+                    }
+                    layer.setStyle({
+                        color: '#fbef2b',
+                        weight: 5,
+                        opacity: 1
+                    });
+                    if (layer.bringToFront) {
+                        layer.bringToFront();
+                    }
+                }
+
+                function unhighlightTrail(itemId) {
+                    const layer = trailLayerMap[itemId];
+                    if (!layer || !trailsGeoJsonLayer) {
+                        return;
+                    }
+                    trailsGeoJsonLayer.resetStyle(layer);
+                }
+
+                function zoomToTrail(itemId) {
+                    const layer = trailLayerMap[itemId];
+                    if (!layer) {
+                        return;
+                    }
+                    if (layer.getBounds) {
+                        map2.fitBounds(layer.getBounds(), { padding: [50, 50] });
+                    } else if (layer.getLatLng) {
+                        map2.setView(layer.getLatLng(), 13);
+                    }
+                }
+
+                function filterTrailList() {
+                    const query = document.getElementById('trailFilterInput').value.trim().toLowerCase();
+                    document.querySelectorAll('#trails-list-content .trail-item').forEach(function (item) {
+                        const text = item.textContent.toLowerCase();
+                        const matches = query === '' || text.indexOf(query) !== -1;
+                        item.style.display = matches ? '' : 'none';
+                        const itemId = item.dataset.itemId;
+                        if (itemId) {
+                            const layer = trailLayerMap[itemId];
+                            if (layer) {
+                                if (matches) {
+                                    layer.setStyle({ opacity: 0.5, weight: 4 }); // Visible
+                                } else {
+                                    layer.setStyle({ opacity: 0, weight: 0 }); // Invisible
+                                }
+                            }
+                        }
+                    });
+                }
+
+                function showElevation(layer) {
+                    if (currFeature === layer.feature) {
+                        // Toggle off
+                        if (map2.hasLayer(elevationControl)) {
+                            map2.removeControl(elevationControl);
+                        }
+                        currFeature = null;
+                    } else {
+                        // Show elevation for this layer
+                        if (!map2.hasLayer(elevationControl)) {
+                            elevationControl.addTo(map2);
+                        }
+                        elevationControl.clear();
+                        elevationControl.addData(layer.feature);
+                        currFeature = layer.feature;
+                    }
+                }
+
+                function fetch_and_draw_data(collectionId, fitbounds) {
+
+                    $("#trails-list-content").empty();
+                    if (trailsGeoJsonLayer) {
+                        map2.removeLayer(trailsGeoJsonLayer);
+                    }
+                    trailLayerMap = {};
+                    trailItemCounter = 0;
+
+                    fetch('/api/collection_tracks/' + collectionId)
+                        .then(function (response) { return response.json(); })
+                        .then(function (data) {
+                            console.log(data)
+                            if (data) {
+                                $(".collection-grid").empty()
+                                $("#collectionTrackCount").html(data.features.length)
+                            }
+                            trailsGeoJsonLayer = L.geoJSON(data, {
+                                style: function (feature) {
+                                    switch (feature.properties.type) {
+                                        case 'HIKE': return { color: "green", opacity: 0.5, weight: 4 };
+                                        case 'OFFROAD': return { color: "#0000ff", opacity: 0.5, weight: 4 };
+                                        default: return { color: "#888888", opacity: 0.5, weight: 4 };
+                                    }
+                                },
+                                pointToLayer: function (feature, latlng) {
+                                    return L.circleMarker(latlng, { color: 'orange', radius: 8 });
+                                },
+                                onEachFeature: function (feature, layer) {
+                                    console.log(feature);
+                                    const itemId = 'trail-item-' + trailItemCounter++;
+                                    trailLayerMap[itemId] = layer;
+                                    // console.log(feature.properties.name)
+                                    layer.on('mouseout', function () {
+                                        if (trailsGeoJsonLayer) {
+                                            trailsGeoJsonLayer.resetStyle(this);
+                                        }
+                                    });
+
+                                    layer.on('mouseover', function () {
+                                        highlightTrail(itemId);
+                                    });
+
+                                    layer.on('click', function (e) {
+                                        showElevation(e.target);
+                                    });
+                                    layer.bindPopup(
+                                        "<img src='img/" + feature.properties.img_name + "' width='259'/><br>"
+                                        + "<b>Name: </b>" + feature.properties.name
+                                        + "<br><b>Length: </b>" + (feature.properties.length / 1000).toFixed(2) + "km"
+                                        + "<br><b>Elevation+: </b>" + feature.properties.elevation_gain + "m"
+                                        + "<br><b>Elevation-: </b>" + feature.properties.elevation_loss + "m"
+                                        + "<br><b>Duration: </b>" + feature.properties.duration
+                                        + "<br><b>Start: </b>" + (feature.properties.start_point_geo)
+                                        + "<br><b>Comment: </b>" + feature.properties.comment
+                                        + "<br><b>Link: </b>  <a href='" + feature.properties.link + "'/>"
+                                    )
+                                        ;
+                                    const card = $("<div class='collection-card'></div>");
+
+                                    const item = $("<div class='collection-content'></div>");
+                                    item.attr('data-item-id', itemId);
+                                    item.css('cursor', 'pointer');
+                                    item.on('mouseover', function () {
+                                        highlightTrail(itemId);
+                                    });
+                                    item.on('mouseout', function () {
+                                        unhighlightTrail(itemId);
+                                    });
+                                    item.on('click', function (e) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        zoomToTrail(itemId);
+                                    });
+                                    item.html(
+                                        '<h3>' + feature.properties.name + '</h3>' +
+                                        '<p>📍Type : ' + feature.properties.type + '</p>' +
+                                        '<p>Distance : ' + ((feature.properties.length / 1000).toFixed(2) || 'N/A') + 'km</p>'
+                                        // + '<button class="btn-secondary add-to-collection-btn" onclick="event.stopPropagation(); openAddToCollectionModal(' + feature.properties.id + ',' + feature.properties.name | +');">Ajouter à une collection</button>'
+                                        + '<button type = "button" class= "btn-secondary" onclick = "event.stopPropagation(); removeTrackFromCollection(' + collectionId + ',' + feature.properties.id + ', this)"> Supprimer</button>'
+                                    );
+                                    console.log(item);
+                                    card.append(item);
+                                    $("#collections-grid").append(card);
+                                }
+                            }).addTo(map2);
+                            if (fitbounds) {
+                                map2.fitBounds(trailsGeoJsonLayer.getBounds(), true);
+                            };
+                        });
+
+                }
+
+                $(document).ready(function () {
+                    map2.on('zoomend', function () {
+                        updateUrl(map2);
+
+                    });
+                    const filterInput = document.getElementById('trailFilterInput');
+                    if (filterInput) {
+                        filterInput.addEventListener('input', filterTrailList);
+                    }
+                });
+
+
+                $(document).ready(function () {
+                    map2.on('moveend', function () {
+                        updateUrl(map2);
+                    });
+                });
+
+                $(document).ready(updateUrl = function (map2) {
+                    // console.log(map2);
+                    var currentZoom = map2.getZoom();
+                    // Example: Hide marker if zoom is less than 10
+                    // You would need to reference the specific layer object here
+                    // console.log(currentZoom)
+                    var bounds = map2.getBounds();
+                    var northWest = bounds.getNorthWest(); // {lat: ..., lng: ...}
+                    var southEast = bounds.getSouthEast(); // {lat: ..., lng: ...}
+                    var center = map2.getCenter();
+                    var lat = center.lat;
+                    var lng = center.lng;
+                    // console.log("NW Lat: " + northWest.lat);
+                    // console.log("NW Lng: " + northWest.lng);
+                    // console.log("SE Lat: " + southEast.lat);
+                    // console.log("SE Lng: " + southEast.lng);
+
+                    // Get current URL and create URL object
+                    const url = new URL(window.location.href);
+
+                    // 1. Add or update a parameter
+                    url.searchParams.set('zoom', currentZoom);
+
+                    // 2. Add a parameter with multiple values
+                    url.searchParams.set('filter', 'active');
+
+                    // 3. Remove a parameter
+                    //url.searchParams.delete('old_param');
+
+                    url.searchParams.set('lat', center.lat);
+                    url.searchParams.set('lng', center.lng);
+
+                    // Update the browser URL without reload
+                    window.history.replaceState({}, document.title, url.toString());
+                    // fetch_and_draw_data(15, false);
+                });
+
+            </script>
+            <script>
+                var map2 = L.map('map2').setView([72.505, -43.09], 6);
+                const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                    name: 'OpenStreetMap',
+                    overlay: false
+                }
+                ).addTo(map2);
+
+                const opentopomap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+                    name: 'OpenTopoMap',
+                    overlay: false
+                }).addTo(map2);
+
+                const osmHOT = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team hosted by OpenStreetMap France'
+                }).addTo(map2);
+
+                const cartodb_positron = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
+                }).addTo(map2);
+
+                const gmaps_routes = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                    maxZoom: 19,
+                    attribution: 'Google Maps Route'
+                }).addTo(map2);
+
+                const gmaps_sat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                    maxZoom: 19,
+                    attribution: 'Google Maps Sat'
+                }).addTo(map2);
+
+                const gmaps_terrain = L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+                    maxZoom: 19,
+                    attribution: 'Google Maps Terrain'
+                }).addTo(map2);
+
+
+                var baseMaps = {
+                    "OpenStreetMap": osm,
+                    "OpenStreetMap.HOT": osmHOT,
+                    "OpenTopoMap": opentopomap,
+                    "Cartodb Positron": cartodb_positron,
+                    "Google Maps Routes": gmaps_routes,
+                    "Google Maps Sat": gmaps_sat,
+                    "Google Maps Terrain": gmaps_terrain,
+                };
+                var layerControl = L.control.layers(baseMaps).addTo(map2);
+
+                fetch_and_draw_data(window.location.pathname.split("/")[2], true);
+            </script>
+        </div>
+
+    </main>
 
     <div class="collections-section">
         <h2>Trails de la collection</h2>
-        <div class="collections-grid">
-            {% if collection.tracks %}
-            {% for track in collection.tracks %}
-            <div class="collection-card">
-                <div class="collection-content">
-                    <h3>{{ track.name }}</h3>
-                    <p>Type : {{ track.type or 'N/A' }}</p>
-                    <p>Distance : {{ '%.2f' % track.length or 'N/A' }}</p>
-                    <p>{{ track.comment or 'Aucun commentaire disponible.' }}</p>
-                    <div class="collection-actions"
-                        style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <a href="/explore/map" class="btn-primary">Voir sur la carte</a>
-                        <button type="button" class="btn-secondary"
-                            onclick="event.stopPropagation(); removeTrackFromCollection({{ collection.id }}, {{ track.id }}, this)">Supprimer</button>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-            {% else %}
-            <div class="activity-card" style="padding: 2rem; text-align: center;">
+        <div class="collections-grid" id="collections-grid">
+            <!-- <div class="activity-card" style="padding: 2rem; text-align: center;">
                 <p>Aucun trail n'a encore été ajouté à cette collection.</p>
-            </div>
-            {% endif %}
+            </div> -->
         </div>
     </div>
 </div>

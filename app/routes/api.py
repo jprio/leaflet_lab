@@ -8,7 +8,11 @@ from flask import (
 )
 import json
 from app.models.domain import db
-from app.models.domain import User, Collection, GPXTrack
+from app.models.domain import User, Collection, GPXTrack, TravelWish, Waypoint
+from geoalchemy2 import WKTElement
+from geoalchemy2.shape import to_shape
+from shapely.geometry import Point
+
 bp = Blueprint('api', __name__, url_prefix='/api')
 
 
@@ -22,16 +26,13 @@ def find_tracks():
     db_session = db.session
     with db_session.connection() as conn:
 
-        # Filter by bounding box using SQL
         sql = f"""
         SELECT *
         FROM gpx_tracks
-        WHERE ST_X(ST_StartPoint(geom)) BETWEEN {NW_lon} AND {SE_lon} 
+        WHERE ST_X(ST_StartPoint(geom)) BETWEEN {NW_lon} AND {SE_lon}
         AND ST_Y(ST_StartPoint(geom)) BETWEEN {SE_lat} AND {NW_lat}
         """
-        # print(sql)
         gdf_tracks = gpd.GeoDataFrame.from_postgis(sql, con=conn)
-        # print(gdf_tracks)
         if gdf_tracks.empty:
             return gdf_tracks.to_json()
 
@@ -49,7 +50,7 @@ def find_tracks():
             print(f"Error formatting start_time or end_time: {e}")
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
-        gdf_tracks['comment'].str.replace('\r\n', '<br>')
+        gdf_tracks['comment'].str.replace('\\r\\n', '<br>')
         return gdf_tracks.to_json()
 
 
@@ -64,13 +65,11 @@ def create_collection():
         return jsonify({'error': 'Collection name is required'}), 400
 
     try:
-        # Get user ID from database
         user_session = db.session
         user = user_session.query(User).filter_by(
             name=session['user']['name']).first()
 
         if not user:
-            # Create user if doesn't exist
             user = User(name=session['user']['name'], email=session['user']
                         ['email'], uuid=session['user']['sub'])
             user_session.add(user)
@@ -78,7 +77,6 @@ def create_collection():
         pic_url = requests.get(
             f"https://api.unsplash.com/photos/random/?query={data['name']}&client_id=Y1Ri-AxBBUpySRvlADwGX-CTWCY9yZv0mJ3peT2_2VE").json()
         print(f"pic url : {pic_url} for {data['name']}")
-        # Create new collection
         new_collection = Collection(
             name=data['name'],
             user_id=user.id,
@@ -102,7 +100,6 @@ def create_collection():
     except Exception as e:
         print(f"Error creating collection: {e}")
         print(traceback.format_exc())
-
         return jsonify({'error': 'Failed to create collection'}), 500
 
 
@@ -112,7 +109,6 @@ def get_collection_infos(collection_id):
         return jsonify({'error': 'Not authenticated'}), 401
 
     try:
-        # Get user ID from database
         user_session = db.session
         user = user_session.query(User).filter_by(
             name=session['user']['name']).first()
@@ -121,7 +117,6 @@ def get_collection_infos(collection_id):
             user_session.close()
             return jsonify({'error': 'User not found'}), 404
 
-        # Find the collection
         collection = user_session.query(Collection).filter_by(
             id=collection_id,
             user_id=user.id
@@ -144,7 +139,6 @@ def get_collection_tracks(collection_id):
         return jsonify({'error': 'Not authenticated'}), 401
 
     try:
-        # Get user ID from database
         user_session = db.session
         user = user_session.query(User).filter_by(
             name=session['user']['name']).first()
@@ -153,7 +147,6 @@ def get_collection_tracks(collection_id):
             user_session.close()
             return jsonify({'error': 'User not found'}), 404
 
-        # Find the collection
         collection = user_session.query(Collection).filter_by(
             id=collection_id,
             user_id=user.id
@@ -181,7 +174,8 @@ def get_collection_tracks(collection_id):
             print(f"Error formatting start_time or end_time: {e}")
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
-        gdf_tracks['comment'].str.replace('\r\n', '<br>')
+        gdf_tracks['comment'] = gdf_tracks['comment'].str.replace(
+            '\\r\\n', '<br>', regex=False)
 
         user_session.commit()
         user_session.close()
@@ -199,7 +193,6 @@ def delete_collection(collection_id):
         return jsonify({'error': 'Not authenticated'}), 401
 
     try:
-        # Get user ID from database
         user_session = db.session
         user = user_session.query(User).filter_by(
             name=session['user']['name']).first()
@@ -208,7 +201,6 @@ def delete_collection(collection_id):
             user_session.close()
             return jsonify({'error': 'User not found'}), 404
 
-        # Find the collection
         collection = user_session.query(Collection).filter_by(
             id=collection_id,
             user_id=user.id
@@ -218,7 +210,6 @@ def delete_collection(collection_id):
             user_session.close()
             return jsonify({'error': 'Collection not found'}), 404
 
-        # Delete the collection
         user_session.delete(collection)
         user_session.commit()
 
@@ -297,3 +288,324 @@ def remove_track_from_collection(collection_id, track_id):
         print(f"Error removing track from collection: {e}")
         print(traceback.format_exc())
         return jsonify({'error': 'Failed to remove trail from collection'}), 500
+
+
+@bp.route('/travel-wishes', methods=['POST'])
+def create_travel_wish():
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        title = data.get('title')
+        description = data.get('description')
+        region = data.get('region')
+
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        new_wish = TravelWish(
+            title=title,
+            description=description,
+            region=region,
+            user_id=current_user.id
+        )
+        db.session.add(new_wish)
+        db.session.commit()
+
+        return jsonify({
+            'id': new_wish.id,
+            'title': new_wish.title,
+            'description': new_wish.description,
+            'region': new_wish.region
+        }), 201
+    except Exception as e:
+        print(f"Error creating travel wish: {e}")
+        return jsonify({'error': 'Failed to create travel wish'}), 500
+
+
+@bp.route('/travel-wishes/<int:wish_id>', methods=['GET'])
+def get_travel_wish(wish_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        wish = db.session.query(TravelWish).filter_by(
+            id=wish_id, user_id=current_user.id).first()
+        if not wish:
+            return jsonify({'error': 'Wish not found'}), 404
+
+        return jsonify({
+            'id': wish.id,
+            'title': wish.title,
+            'description': wish.description,
+            'region': wish.region
+        }), 200
+    except Exception as e:
+        print(f"Error getting travel wish: {e}")
+        return jsonify({'error': 'Failed to get travel wish'}), 500
+
+
+@bp.route('/travel-wishes/<int:wish_id>', methods=['PUT'])
+def update_travel_wish(wish_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        wish = db.session.query(TravelWish).filter_by(
+            id=wish_id, user_id=current_user.id).first()
+        if not wish:
+            return jsonify({'error': 'Wish not found'}), 404
+
+        if 'title' in data:
+            wish.title = data['title']
+        if 'description' in data:
+            wish.description = data['description']
+        if 'region' in data:
+            wish.region = data['region']
+
+        db.session.commit()
+
+        return jsonify({
+            'id': wish.id,
+            'title': wish.title,
+            'description': wish.description,
+            'region': wish.region
+        }), 200
+    except Exception as e:
+        print(f"Error updating travel wish: {e}")
+        return jsonify({'error': 'Failed to update travel wish'}), 500
+
+
+@bp.route('/travel-wishes/<int:wish_id>', methods=['DELETE'])
+def delete_travel_wish(wish_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        wish = db.session.query(TravelWish).filter_by(
+            id=wish_id, user_id=current_user.id).first()
+        if not wish:
+            return jsonify({'error': 'Wish not found'}), 404
+
+        db.session.delete(wish)
+        db.session.commit()
+
+        return jsonify({'message': 'Travel wish deleted successfully'}), 200
+    except Exception as e:
+        print(f"Error deleting travel wish: {e}")
+        return jsonify({'error': 'Failed to delete travel wish'}), 500
+
+
+@bp.route('/waypoints', methods=['GET'])
+def get_waypoints():
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoints = db.session.query(Waypoint).filter_by(
+            user_id=current_user.id).all()
+
+        waypoints_data = []
+        for wp in waypoints:
+            shapely_point = to_shape(wp.geom)
+            waypoints_data.append({
+                'id': wp.id,
+                'description': wp.description,
+                'lat': shapely_point.y,
+                'lng': shapely_point.x,
+                'created_at': wp.created_at.isoformat() if wp.created_at else None
+            })
+
+        return jsonify(waypoints_data), 200
+    except Exception as e:
+        print(f"Error getting waypoints: {e}")
+        return jsonify({'error': 'Failed to get the waypoints'}), 500
+
+
+@bp.route('/waypoints', methods=['POST'])
+def create_waypoint():
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        lat = data.get('lat')
+        lng = data.get('lng')
+        description = data.get('description', '')
+
+        if lat is None or lng is None:
+            return jsonify({'error': 'Latitude and longitude are required'}), 400
+
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        point = Point(lng, lat)
+        wkt = point.wkt
+
+        new_waypoint = Waypoint(
+            description=description,
+            user_id=current_user.id,
+            geom=WKTElement(wkt, srid=4326)
+        )
+        db.session.add(new_waypoint)
+        db.session.commit()
+
+        return jsonify({
+            'id': new_waypoint.id,
+            'description': new_waypoint.description,
+            'lat': lat,
+            'lng': lng,
+            'created_at': new_waypoint.created_at.isoformat() if new_waypoint.created_at else None
+        }), 201
+    except Exception as e:
+        print(f"Error creating waypoint: {e}")
+        return jsonify({'error': 'Failed to create waypoint'}), 500
+
+
+@bp.route('/waypoints/<int:waypoint_id>', methods=['GET'])
+def get_waypoint(waypoint_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        shapely_point = to_shape(waypoint.geom)
+        return jsonify({
+            'id': waypoint.id,
+            'description': waypoint.description,
+            'lat': shapely_point.y,
+            'lng': shapely_point.x,
+            'created_at': waypoint.created_at.isoformat() if waypoint.created_at else None
+        }), 200
+    except Exception as e:
+        print(f"Error getting waypoint: {e}")
+        return jsonify({'error': 'Failed to get waypoint'}), 500
+
+
+@bp.route('/waypoints/<int:waypoint_id>', methods=['PUT'])
+def update_waypoint(waypoint_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        if 'description' in data:
+            waypoint.description = data['description']
+
+        db.session.commit()
+
+        shapely_point = to_shape(waypoint.geom)
+        return jsonify({
+            'id': waypoint.id,
+            'description': waypoint.description,
+            'lat': shapely_point.y,
+            'lng': shapely_point.x,
+            'created_at': waypoint.created_at.isoformat() if waypoint.created_at else None
+        }), 200
+    except Exception as e:
+        print(f"Error updating waypoint: {e}")
+        return jsonify({'error': 'Failed to update waypoint'}), 500
+
+
+@bp.route('/waypoints/<int:waypoint_id>', methods=['DELETE'])
+def delete_waypoint(waypoint_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        db.session.delete(waypoint)
+        db.session.commit()
+
+        return jsonify({'message': 'Waypoint deleted successfully'}), 200
+    except Exception as e:
+        print(f"Error deleting waypoint: {e}")
+        return jsonify({'error': 'Failed to delete waypoint'}), 500
+
+
+@bp.route('/waypoints/<int:waypoint_id>/add-to-collection/<int:collection_id>', methods=['POST'])
+def add_waypoint_to_collection(waypoint_id, collection_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        current_user = db.session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 404
+
+        waypoint = db.session.query(Waypoint).filter_by(
+            id=waypoint_id, user_id=current_user.id).first()
+        if not waypoint:
+            return jsonify({'error': 'Waypoint not found'}), 404
+
+        collection = db.session.query(Collection).filter_by(
+            id=collection_id, user_id=current_user.id).first()
+        if not collection:
+            return jsonify({'error': 'Collection not found'}), 404
+
+        if waypoint not in collection.waypoints:
+            collection.waypoints.append(waypoint)
+            db.session.commit()
+
+        return jsonify({'message': 'Waypoint added to collection successfully'}), 200
+    except Exception as e:
+        print(f"Error adding waypoint to collection: {e}")
+        return jsonify({'error': 'Failed to add waypoint to collection'}), 500
