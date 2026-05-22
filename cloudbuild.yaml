@@ -1,14 +1,39 @@
 steps:
   # Docker Build
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 
-           'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/alltrail', 
-           '.']
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/alltrail",
+        ".",
+      ]
 
   # Docker Push
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 
-           'us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/alltrail']
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "push",
+        "us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/alltrail",
+      ]
+
+  # 3. Déployer l'image sur Cloud Run
+  - name: "gcr.io/cloud-builders/docker"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "alltrail"
+      - "--image"
+      - "us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/alltrail:$COMMIT_SHA"
+      - "--region"
+      - "us-centrail1"
+      - "--platform"
+      - "managed"
+
+# Indiquer à Cloud Build de stocker l'image
+images:
+  - "us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/alltrail:$COMMIT_SHA"
 
 options:
- logging: CLOUD_LOGGING_ONLY
+  logging: CLOUD_LOGGING_ONLY
