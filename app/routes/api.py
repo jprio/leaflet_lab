@@ -51,7 +51,26 @@ def find_tracks():
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
         gdf_tracks['comment'].str.replace('\\r\\n', '<br>')
+        print(gdf_tracks)
         return gdf_tracks.to_json()
+
+
+@bp.route('/search_places', methods=['GET'])
+def search_places():
+    from requests.structures import CaseInsensitiveDict
+
+    NW_lat = request.args.get('NW_lat')
+    NW_lon = request.args.get('NW_lon')
+    SE_lat = request.args.get('SE_lat')
+    SE_lon = request.args.get('SE_lon')
+    url = f"https://api.geoapify.com/v2/places?categories=commercial.supermarket&filter=rect%3A10.716463143326969%2C48.755151258420966%2C10.835314015356737%2C48.680903341613316&limit=20&apiKey={os.getenv('GEOAPIFY_API_KEY')}"
+
+    headers = CaseInsensitiveDict()
+    headers["Accept"] = "application/json"
+
+    resp = requests.get(url, headers=headers)
+    print(resp.text)
+    return jsonify(resp.json())
 
 
 @bp.route('/collections', methods=['POST'])

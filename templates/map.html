@@ -104,7 +104,7 @@
 <main class="main-content">
     <!-- Left column - Trail List -->
     <div class="trails-list">
-        <h2>Trail List</h2>
+        <h2>Trail List (<text id="trail-count" style="font-style: italic;"></text>)</h2>
         <div class="trail-filter">
             <input id="trailFilterInput" type="text" class="search-input"
                 placeholder="Filtrer les trails par nom ou type" />
@@ -202,6 +202,37 @@
                 }
             }
 
+            function updateTrailCount() {
+                const items = Array.from(document.querySelectorAll('#trails-list-content .trail-item'));
+                const visibleCount = items.filter(function (item) {
+                    return item.style.display !== 'none';
+                }).length;
+                const totalCount = items.length;
+                const countText = totalCount === 0 ? 'Aucun trail' : (visibleCount === totalCount ? totalCount + ' trail' + (totalCount > 1 ? 's' : '') : visibleCount + ' / ' + totalCount + ' trail' + (totalCount > 1 ? 's' : ''));
+                document.getElementById('trail-count').textContent = countText;
+            }
+
+            function filterTrailList() {
+                const query = document.getElementById('trailFilterInput').value.trim().toLowerCase();
+                document.querySelectorAll('#trails-list-content .trail-item').forEach(function (item) {
+                    const text = item.textContent.toLowerCase();
+                    const matches = query === '' || text.indexOf(query) !== -1;
+                    item.style.display = matches ? '' : 'none';
+                    const itemId = item.dataset.itemId;
+                    if (itemId) {
+                        const layer = trailLayerMap[itemId];
+                        if (layer) {
+                            if (matches) {
+                                layer.setStyle({ opacity: 0.5, weight: 4 }); // Visible
+                            } else {
+                                layer.setStyle({ opacity: 0, weight: 0 }); // Invisible
+                            }
+                        }
+                    }
+                });
+                updateTrailCount();
+            }
+
             function fetch_and_draw_data({ NW_lat, NW_lon, SE_lat, SE_lon, fitbounds } = {}) {
 
                 $("#trails-list-content").empty();
@@ -214,6 +245,25 @@
                 fetch('/api/find_tracks?NW_lon=' + NW_lon + '&SE_lon=' + SE_lon + '&NW_lat=' + NW_lat + '&SE_lat=' + SE_lat)
                     .then(function (response) { return response.json(); })
                     .then(function (data) {
+                        var seenTrailKeys = new Set();
+                        if (data && Array.isArray(data.features)) {
+                            data = Object.assign({}, data, {
+                                features: data.features.filter(function (feature) {
+                                    if (!feature || !feature.properties) {
+                                        return false;
+                                    }
+                                    var key = feature.properties.id !== undefined && feature.properties.id !== null
+                                        ? feature.properties.id
+                                        : (feature.properties.name || '') + '|' + (feature.properties.length || '');
+                                    if (seenTrailKeys.has(key)) {
+                                        return false;
+                                    }
+                                    seenTrailKeys.add(key);
+                                    return true;
+                                })
+                            });
+                        }
+                        $("#trails-list-content").empty();
                         trailsGeoJsonLayer = L.geoJSON(data, {
                             style: function (feature) {
                                 switch (feature.properties.type) {
@@ -282,7 +332,8 @@
                         }).addTo(map2);
                         if (fitbounds) {
                             map2.fitBounds(trailsGeoJsonLayer.getBounds());
-                        };
+                        }
+                        filterTrailList();
                     });
 
             }
