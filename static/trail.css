@@ -134,10 +134,13 @@
             padding: 0.5rem;
             display: flex;
             gap: 0.5rem;
+            align-items: center;
         }
 
         .search-input {
-            flex: 1;
+            max-width: 100%;
+            width: 700px;
+            background-color: #e3e5eb;
             border: none;
             padding: 0.75rem 1rem;
             font-size: 1rem;
@@ -573,7 +576,7 @@
             padding: 15px;
             margin: 5px 0 22px 0;
             border: none;
-            background: #5c2fb1;
+            background: #378d3a;
         }
 
         /* Responsive */

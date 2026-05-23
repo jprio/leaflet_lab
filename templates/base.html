@@ -39,7 +39,24 @@
                 Trail Explorer
             </a>
             <nav>
-                <a href="#">Explore</a>
+                <!-- Conteneur du popup -->
+                <div id="myForm" class="form-popup">
+                    <form method=post action="/upload" enctype=multipart/form-data class="form-container">
+                        <label for="file">Select a file:</label><input type=file name=file></input><br>
+                        <!-- <input type=text name=type_activity placeholder="Type (e.g., hiking, biking)"></input><br> -->
+                        <label for="activity_type">Activity Type:</label>
+                        <select name="activity_type" id="activity_type">
+                            <option value="HIKE">Hike</option>
+                            <option value="OFFROAD">Off-road</option>
+                        </select><br>
+                        <label for="comment">Commentaire:</label><br>
+                        <textarea rows="10" cols="50" name=comment placeholder="Add a comment"></textarea><br>
+                        <input type=submit value=Upload></input>
+                        <button type="button" class="btn cancel" onclick="closeForm()">Fermer</button>
+                    </form>
+                </div>
+
+                <a href="#" onclick="openForm()">Upload GPX</a>
                 <a href="#">My Trails</a>
                 <a href="#">Guides</a>
                 <div align="right"> {% if 'user' in session %}
@@ -96,113 +113,6 @@
                 <p>© 2026 Trail Explorer. All rights reserved.</p>
             </div>
         </footer>
-
-        <!-- <script>
-            // Full list options at "leaflet-elevation.js"
-            var elevation_options = {
-
-                // Default chart colors: theme lime-theme, magenta-theme, ...
-                theme: "lightblue-theme",
-
-                // Chart container outside/inside map container
-                detached: false,
-
-                // if (detached), the elevation chart container
-                // elevationDiv: "#elevation-div",
-
-                // if (!detached) autohide chart profile on chart mouseleave
-                autohide: false,
-
-                // if (!detached) initial state of chart profile control
-                collapsed: false,
-
-                // if (!detached) control position on one of map corners
-                position: "topright",
-
-                // Toggle close icon visibility
-                closeBtn: true,
-
-                // Autoupdate map center on chart mouseover.
-                followMarker: true,
-
-                // Autoupdate map bounds on chart update.
-                autofitBounds: true,
-
-                // Chart distance/elevation units.
-                imperial: false,
-
-                // [Lat, Long] vs [Long, Lat] points. (leaflet default: [Lat, Long])
-                reverseCoords: false,
-
-                // Acceleration chart profile: true || "summary" || "disabled" || false
-                acceleration: false,
-
-                // Slope chart profile: true || "summary" || "disabled" || false
-                slope: false,
-
-                // Speed chart profile: true || "summary" || "disabled" || false
-                speed: false,
-
-                // Altitude chart profile: true || "summary" || "disabled" || false
-                altitude: true,
-
-                // Display time info: true || "summary" || false
-                time: true,
-
-                // Display distance info: true || "summary" || false
-                distance: true,
-
-                // Summary track info style: "inline" || "multiline" || false
-                summary: 'multiline',
-
-                // Download link: "link" || false || "modal"
-                downloadLink: 'link',
-
-                // Toggle chart ruler filter
-                ruler: true,
-
-                // Toggle chart legend filter
-                legend: true,
-
-                // Toggle "leaflet-almostover" integration
-                almostOver: true,
-
-                // Toggle "leaflet-distance-markers" integration
-                distanceMarkers: false,
-
-                // Toggle "leaflet-edgescale" integration
-                edgeScale: false,
-
-                // Toggle "leaflet-hotline" integration
-                hotline: true,
-
-                // Display track datetimes: true || false
-                timestamps: false,
-
-                // Display track waypoints: true || "markers" || "dots" || false
-                waypoints: true,
-
-                // Toggle custom waypoint icons: true || { associative array of <sym> tags } || false
-                wptIcons: {
-                    '': L.divIcon({
-                        className: 'elevation-waypoint-marker',
-                        html: '<i class="elevation-waypoint-icon"></i>',
-                        iconSize: [30, 30],
-                        iconAnchor: [8, 30],
-                    }),
-                },
-
-                // Toggle waypoint labels: true || "markers" || "dots" || false
-                wptLabels: true,
-
-                // Render chart profiles as Canvas or SVG Paths
-                preferCanvas: true,
-
-            };
-            
-            
-        </script>
-        -->
 </body>
 
 </html>

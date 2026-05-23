@@ -14,23 +14,6 @@
         }
     </script>
     <div class="search-container">
-        <button onclick="openForm()" class="openButton">Nouvelle trace</button>
-        <!-- Conteneur du popup -->
-        <div id="myForm" class="form-popup">
-            <form method=post action="/upload" enctype=multipart/form-data class="form-container">
-                <label for="file">Select a file:</label><input type=file name=file></input><br>
-                <!-- <input type=text name=type_activity placeholder="Type (e.g., hiking, biking)"></input><br> -->
-                <label for="activity_type">Activity Type:</label>
-                <select name="activity_type" id="activity_type">
-                    <option value="HIKE">Hike</option>
-                    <option value="OFFROAD">Off-road</option>
-                </select><br>
-                <label for="comment">Commentaire:</label><br>
-                <textarea rows="10" cols="50" name=comment placeholder="Add a comment"></textarea><br>
-                <input type=submit value=Upload></input>
-                <button type="button" class="btn cancel" onclick="closeForm()">Fermer</button>
-            </form>
-        </div>
         <script>
             var selectedPlace = null;
             var searchMarker = null;
@@ -88,17 +71,18 @@
             });
         </script>
         <div>
-            <form id="search-form" onsubmit="event.preventDefault();">
+            <form id="search-form" onsubmit="event.preventDefault();"
+                style=" gap: 0.5rem; align-items: center; width: 100%;">
                 <input type="text" id="search-input" class="search-input" placeholder="Where do you want to go?">
                 <!-- <button class="search-btn">Search</button> -->
             </form>
         </div>
     </div>
 
-    <dialog id="my-dialog" popover>
+    <!-- <dialog id="my-dialog" popover>
         <p>This dialog was opened using a popovertargetaction attribute.</p>
         <button popovertarget="my-dialog" popovertargetaction="hide">Close</button>
-    </dialog>
+    </dialog> -->
 </section>
 
 <section class="filters">

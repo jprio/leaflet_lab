@@ -12,7 +12,6 @@ recherche de lieux : google places api
 build/run : docker build -t alltrail-map . && docker run -p 5000:5000 alltrail-map
 deployment : google cloud run + cloud build
 
-
 Specs : 
 - gestion des collections 
 - nom du parcours
