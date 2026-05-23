@@ -1,13 +1,13 @@
+from http import HTTPStatus
+from flask import abort
+from flask_login import LoginManager, login_required, login_user, logout_user, current_user, login_manager
 from app.models.domain import db
 from flask import Flask, render_template, make_response, redirect, request, session, g, flash, url_for, Blueprint, jsonify
 from flask_cors import CORS, cross_origin
-import folium
 from folium import Element
 from datetime import timedelta, datetime
-import requests
-import json
 from sqlalchemy.sql import func
-
+import requests
 from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 import os
@@ -26,18 +26,25 @@ from flask_sqlalchemy import SQLAlchemy
 import geocoder
 import traceback
 from sqlalchemy.orm import joinedload
+from flask_login import LoginManager, login_required
+
 
 ALLOWED_EXTENSIONS = {'gpx', 'tcx', 'fit', 'csv'}
 load_dotenv()  # Charger les variables d'environnement à partir du fichier .env
 
 
+login_manager = LoginManager()
+
+
 def create_app():
-    import app.models as models
-    import app.routes as routes
 
     app = Flask(__name__, static_url_path='',
                 static_folder='static')
+    login_manager.init_app(app)
+
     CORS(app)
+    import app.models as models
+    import app.routes as routes
 
     models.init_app(app)
     routes.init_app(app)
@@ -57,6 +64,7 @@ def create_app():
     app.register_blueprint(explore.bp)
     app.register_blueprint(api.bp)
     db.init_app(app)
+
     return app
 
 
@@ -64,6 +72,21 @@ app = create_app()
 with app.app_context():
     db.create_all()
 print("app created")
+
+
+@login_manager.user_loader
+def load_user(id):
+    # 1. Fetch against the database a user by `id`
+    # 2. Create a new object of `User` class and return it.
+    # u = DBUsers.query.get(id)
+    return db.session.query(User).filter_by(uuid=id).first()
+
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    if request.blueprint == 'api':
+        abort(HTTPStatus.UNAUTHORIZED)
+    return redirect(url_for('site.login'))
 
 
 @app.route("/")
@@ -168,15 +191,25 @@ def upload_file():
         return redirect("/explore/map")
 
 
-@app.route('/search', methods=['GET'])
-def autocomplete():
+@app.route('/search_places', methods=['GET'])
+@login_required
+def search_places():
+    api_key = os.getenv('GOOGLE_API_KEY')
     # Retrieve the search term sent by jQuery
-    search = request.args.get('term')
+    search = request.args.get('search')
     print("search : " + search)
-    results = ["titi", "tata", "toto"]
+    url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    params = {
+        "query": search,
+        "key": api_key,
+        "language": "fr"  # Optionnel : spécifie la langue des résultats
+    }
 
+    response = requests.get(url, params=params)
+    data = response.json()
+    # print(data)
     # Return JSON response
-    return jsonify(results=results)
+    return jsonify(results=data["results"])
 
 
 @app.route('/collection/<int:collection_id>')
@@ -212,4 +245,4 @@ def travel_wishes():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

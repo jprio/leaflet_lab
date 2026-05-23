@@ -1,6 +1,8 @@
+from flask import abort, redirect, url_for, request, current_app as app
 from flask import (
     Blueprint, request, g, redirect, url_for, flash, render_template, session
 )
+from flask_login import login_user
 import os
 import requests
 from oauthlib import oauth2
@@ -8,6 +10,7 @@ import json
 from app.models.domain import db
 from app.models.domain import User, Collection
 bp = Blueprint('auth', __name__, url_prefix='/auth')
+
 DATA = {
     # this tells the auth server that we are invoking authorization workflow
     'response_type': "code",
@@ -103,7 +106,9 @@ def home():
         db.session.add(user)
         db.session.commit()
     print(session['user'])
-    return redirect('/alltrail')
+    login_user(user, remember=True)
+
+    return redirect('/explore/map')
 
 
 @bp.route('/me')

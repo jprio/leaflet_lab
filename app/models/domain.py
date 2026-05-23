@@ -33,6 +33,17 @@ db = SQLAlchemy(model_class=Base)
 
 @dataclass
 class User(Base):
+
+    def is_active(self):
+        # Here you should write whatever the code is
+        # that checks the database if your user is active
+        return self.active
+
+    def is_anonymous(self):
+        return False
+
+    def is_authenticated(self):
+        return True
     __tablename__ = "user_account"
     id: Mapped[int] = mapped_column(primary_key=True)
     uuid: Mapped[str] = mapped_column(String(36), unique=True)
@@ -49,6 +60,9 @@ class User(Base):
     waypoints: Mapped[List["Waypoint"]] = relationship("Waypoint",
                                                        back_populates="user", cascade="all, delete-orphan"
                                                        )
+
+    def get_id(self):
+        return self.uuid
 
     def __repr__(self) -> str:
         return f"User(id={self.id!r}, name={self.name!r}, email={self.email!r}, collections={self.collections!r})"

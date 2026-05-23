@@ -32,22 +32,66 @@
             </form>
         </div>
         <script>
+            var selectedPlace = null;
+            var searchMarker = null;
+
+            function goToSearchPlace(place) {
+                if (!place || !place.geometry || !place.geometry.location) {
+                    return;
+                }
+                var lat = place.geometry.location.lat;
+                var lng = place.geometry.location.lng;
+                if (searchMarker && map2) {
+                    map2.removeLayer(searchMarker);
+                }
+                searchMarker = L.marker([lat, lng]).addTo(map2)
+                    .bindPopup(place.formatted_address || place.name || 'Lieu recherché')
+                    .openPopup();
+                map2.setView([lat, lng], 13);
+            }
+
             $(function () {
-                var availableTags = ["aaaa", "bbbff", "ccceerr", "ddddd", "eeeee"];
-
-                $(function () {
-                    $("#search-input").autocomplete({
-                        source: availableTags, // Use the availableTags array for autocomplete suggestions
-                        minLength: 2 // Trigger after 2 characters
-                    });
+                $("#search-input").autocomplete({
+                    source: function (request, response) {
+                        $.ajax({
+                            url: "/search_places",
+                            dataType: "json",
+                            data: {
+                                search: request.term
+                            },
+                            success: function (data) {
+                                if (!data || !Array.isArray(data.results)) {
+                                    response([]);
+                                    return;
+                                }
+                                response(data.results.map(function (place) {
+                                    return {
+                                        label: place.formatted_address || place.name || place.vicinity || "",
+                                        value: place.formatted_address || place.name || place.vicinity || "",
+                                        place: place
+                                    };
+                                }));
+                            },
+                            error: function (xhr, status, error) {
+                                console.error('Autocomplete error:', error);
+                                response([]);
+                            }
+                        });
+                    },
+                    minLength: 2,
+                    select: function (event, ui) {
+                        selectedPlace = ui.item.place;
+                        $(this).val(ui.item.value);
+                        return false;
+                    }
                 });
-
-
             });
         </script>
         <div>
-            <input type="text" id="search-input" class="search-input" placeholder="Where do you want to go?">
-            <button class="search-btn">Search</button>
+            <form id="search-form" onsubmit="event.preventDefault();">
+                <input type="text" id="search-input" class="search-input" placeholder="Where do you want to go?">
+                <!-- <button class="search-btn">Search</button> -->
+            </form>
         </div>
     </div>
 
@@ -261,7 +305,7 @@
 
             $(document).ready(function () {
                 map2.on('zoomend', function () {
-                    updateUrl(map2);
+                    updateMap(map2);
 
                 });
                 const filterInput = document.getElementById('trailFilterInput');
@@ -273,12 +317,11 @@
 
             $(document).ready(function () {
                 map2.on('moveend', function () {
-                    updateUrl(map2);
+                    updateMap(map2);
                 });
             });
 
-            $(document).ready(updateUrl = function (map2) {
-                // console.log(map2);
+            $(document).ready(updateMap = function (map2) {
                 var currentZoom = map2.getZoom();
                 // Example: Hide marker if zoom is less than 10
                 // You would need to reference the specific layer object here
@@ -289,23 +332,10 @@
                 var center = map2.getCenter();
                 var lat = center.lat;
                 var lng = center.lng;
-                // console.log("NW Lat: " + northWest.lat);
-                // console.log("NW Lng: " + northWest.lng);
-                // console.log("SE Lat: " + southEast.lat);
-                // console.log("SE Lng: " + southEast.lng);
-
                 // Get current URL and create URL object
                 const url = new URL(window.location.href);
-
-                // 1. Add or update a parameter
                 url.searchParams.set('zoom', currentZoom);
-
-                // 2. Add a parameter with multiple values
                 url.searchParams.set('filter', 'active');
-
-                // 3. Remove a parameter
-                //url.searchParams.delete('old_param');
-
                 url.searchParams.set('lat', center.lat);
                 url.searchParams.set('lng', center.lng);
 
@@ -316,7 +346,13 @@
 
         </script>
         <script>
-            var map2 = L.map('map2').setView([72.505, -43.09], 6);
+            var map2 = L.map('map2');
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const userLat = position.coords.latitude;
+                    const userLng = position.coords.longitude;
+                    map2.setView([userLat, userLng], 13);
+                })
             const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -368,7 +404,36 @@
             };
             var layerControl = L.control.layers(baseMaps).addTo(map2);
 
-            fetch_and_draw_data({ NW_lat: 42.71069600569497, NW_lon: 76.06109619140626, SE_lat: 41.48800607185427, SE_lon: 79.14550781250001, fitbounds: true });
+            document.getElementById('search-form').addEventListener('submit', function (event) {
+                event.preventDefault();
+                var query = document.getElementById('search-input').value.trim();
+                if (!query) {
+                    return;
+                }
+                if (selectedPlace && (selectedPlace.formatted_address === query || selectedPlace.name === query || selectedPlace.vicinity === query)) {
+                    goToSearchPlace(selectedPlace);
+                    return;
+                }
+                $.ajax({
+                    url: '/search_places',
+                    dataType: 'json',
+                    data: { search: query },
+                    success: function (data) {
+                        if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+                            console.warn('Aucun résultat trouvé pour', query);
+                            return;
+                        }
+                        selectedPlace = data.results[0];
+                        goToSearchPlace(selectedPlace);
+                    },
+                    error: function (xhr, status, error) {
+                        console.error('Search submit error:', error);
+                    }
+                });
+            });
+
+            // fetch_and_draw_data({ NW_lat: 42.71069600569497, NW_lon: 76.06109619140626, SE_lat: 41.48800607185427, SE_lon: 79.14550781250001, fitbounds: true });
+            // fetch_and_draw_data({ NW_lat: 42.71069600569497, NW_lon: 76.06109619140626, SE_lat: 41.48800607185427, SE_lon: 79.14550781250001, fitbounds: true });
         </script>
     </div>
 
