@@ -110,7 +110,7 @@
                             const layer = trailLayerMap[itemId];
                             if (layer) {
                                 if (matches) {
-                                    layer.setStyle({ opacity: 0.5, weight: 4 }); // Visible
+                                    layer.setStyle({ opacity: 1, weight: 4 }); // Visible
                                 } else {
                                     layer.setStyle({ opacity: 0, weight: 0 }); // Invisible
                                 }
@@ -157,9 +157,9 @@
                             trailsGeoJsonLayer = L.geoJSON(data, {
                                 style: function (feature) {
                                     switch (feature.properties.type) {
-                                        case 'HIKE': return { color: "green", opacity: 0.5, weight: 4 };
-                                        case 'OFFROAD': return { color: "#0000ff", opacity: 0.5, weight: 4 };
-                                        default: return { color: "#888888", opacity: 0.5, weight: 4 };
+                                        case 'HIKE': return { color: "green", opacity: 1, weight: 4 };
+                                        case 'OFFROAD': return { color: "#0000ff", opacity: 1, weight: 4 };
+                                        default: return { color: "#888888", opacity: 1, weight: 4 };
                                     }
                                 },
                                 pointToLayer: function (feature, latlng) {

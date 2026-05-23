@@ -17,6 +17,7 @@
         <script>
             var selectedPlace = null;
             var searchMarker = null;
+            const currentUserUuid = {{ current_user_uuid| tojson | safe }};
 
             function goToSearchPlace(place) {
                 if (!place || !place.geometry || !place.geometry.location) {
@@ -162,6 +163,59 @@
                 } else if (layer.getLatLng) {
                     map2.setView(layer.getLatLng(), 13);
                 }
+            }
+
+            function editTrack(trackId, currentName, currentComment) {
+                var newName = prompt('Modifier le nom du track', currentName || '');
+                if (newName === null) {
+                    return;
+                }
+                var newComment = prompt('Modifier la description du track', currentComment || '');
+                if (newComment === null) {
+                    return;
+                }
+                fetch(`/api/tracks/${trackId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: newName, comment: newComment })
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            return response.json().then(function (error) { throw error; });
+                        }
+                        return response.json();
+                    })
+                    .then(function () {
+                        updateMap(map2);
+                    })
+                    .catch(function (error) {
+                        console.error('Track update failed:', error);
+                        alert('Impossible de mettre à jour le track.');
+                    });
+            }
+
+            function deleteTrack(trackId) {
+                if (!confirm('Voulez-vous vraiment supprimer ce track ? Cette action est irréversible.')) {
+                    return;
+                }
+                fetch(`/api/tracks/${trackId}`, {
+                    method: 'DELETE'
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            return response.json().then(function (error) { throw error; });
+                        }
+                        return response.json();
+                    })
+                    .then(function () {
+                        updateMap(map2);
+                    })
+                    .catch(function (error) {
+                        console.error('Track deletion failed:', error);
+                        alert('Impossible de supprimer le track.');
+                    });
             }
 
             function filterTrailList() {
@@ -323,9 +377,29 @@
                                     '<h3>' + feature.properties.name + '</h3>' +
                                     '<p>📍Type : ' + feature.properties.type + '</p>' +
                                     '<p>Distance : ' + ((feature.properties.length / 1000).toFixed(2) || 'N/A') + 'km</p>'
-                                    // + '<button class="btn-secondary add-to-collection-btn" onclick="event.stopPropagation(); openAddToCollectionModal(' + feature.properties.id + ',' + feature.properties.name | +');">Ajouter à une collection</button>'
-                                    + '<button class="btn-secondary add-to-collection-btn" onclick="event.stopPropagation(); openAddToCollectionModal(\'' + feature.properties.id + '\',\'' + feature.properties.name + '\');">Ajouter à une collection</button>'
                                 );
+                                const actions = $("<div class='track-item-actions'></div>");
+                                if (currentUserUuid && feature.properties.owner === currentUserUuid) {
+                                    const editBtn = $("<button type='button' class='track-action-icon track-action-edit' title='Modifier le track'>✏️</button>");
+                                    editBtn.on('click', function (e) {
+                                        e.stopPropagation();
+                                        editTrack(feature.properties.id, feature.properties.name, feature.properties.comment || '');
+                                    });
+                                    const deleteBtn = $("<button type='button' class='track-action-icon track-action-delete' title='Supprimer le track'>🗑️</button>");
+                                    deleteBtn.on('click', function (e) {
+                                        e.stopPropagation();
+                                        deleteTrack(feature.properties.id);
+                                    });
+                                    actions.append(editBtn).append(deleteBtn);
+                                }
+
+                                const addBtn = $("<button type='button' class='track-action-icon track-action-add' title='Ajouter à une collection'>➕</button>");
+                                addBtn.on('click', function (e) {
+                                    e.stopPropagation();
+                                    openAddToCollectionModal(feature.properties.id, feature.properties.name);
+                                });
+                                actions.append(addBtn);
+                                item.append(actions);
 
                                 $("#trails-list-content").append(item);
                             }

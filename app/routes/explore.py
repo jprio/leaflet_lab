@@ -15,13 +15,15 @@ def explore():
     db_session = db.session
     with db_session.connection() as conn:
         user_collections = []
+        current_user_uuid = None
         if 'user' in session:
             current_user = db.session.query(User).filter_by(
                 uuid=session['user'].get('sub')).first()
             if current_user:
                 user_collections = current_user.collections
+                current_user_uuid = current_user.uuid
 
     db_session.close()
 
     return render_template(
-        'map.html', user_collections=user_collections)
+        'map.html', user_collections=user_collections, current_user_uuid=current_user_uuid)

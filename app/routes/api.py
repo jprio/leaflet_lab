@@ -309,6 +309,64 @@ def remove_track_from_collection(collection_id, track_id):
         return jsonify({'error': 'Failed to remove trail from collection'}), 500
 
 
+@bp.route('/tracks/<int:track_id>', methods=['PUT'])
+def update_track(track_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    if not data or ('name' not in data and 'comment' not in data):
+        return jsonify({'error': 'Name or comment is required'}), 400
+
+    current_user = db.session.query(User).filter_by(
+        uuid=session['user'].get('sub')).first()
+    if not current_user:
+        return jsonify({'error': 'User not found'}), 404
+
+    track = db.session.query(GPXTrack).filter_by(id=track_id).first()
+    if not track:
+        return jsonify({'error': 'Track not found'}), 404
+
+    if track.owner != current_user.uuid:
+        return jsonify({'error': 'Forbidden'}), 403
+
+    if 'name' in data:
+        track.name = data['name']
+    if 'comment' in data:
+        track.comment = data['comment']
+
+    db.session.commit()
+    return jsonify({'message': 'Track updated successfully'}), 200
+
+
+@bp.route('/tracks/<int:track_id>', methods=['DELETE'])
+def delete_track(track_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    current_user = db.session.query(User).filter_by(
+        uuid=session['user'].get('sub')).first()
+    if not current_user:
+        return jsonify({'error': 'User not found'}), 404
+
+    track = db.session.query(GPXTrack).filter_by(id=track_id).first()
+    if not track:
+        return jsonify({'error': 'Track not found'}), 404
+
+    if track.owner != current_user.uuid:
+        return jsonify({'error': 'Forbidden'}), 403
+
+    try:
+        track.collections = []
+        db.session.delete(track)
+        db.session.commit()
+        return jsonify({'message': 'Track deleted successfully'}), 200
+    except Exception as e:
+        print(f"Error deleting track: {e}")
+        print(traceback.format_exc())
+        return jsonify({'error': 'Failed to delete track'}), 500
+
+
 @bp.route('/travel-wishes', methods=['POST'])
 def create_travel_wish():
     if 'user' not in session:
