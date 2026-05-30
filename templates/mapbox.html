@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Add 3D models using a GeoJSON source</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.24.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.24.0/mapbox-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoianByaW8iLCJhIjoiY21wazBmeDdhMXMxaTJzczJjam5rMnljNyJ9.oHCFZAp0kQ4Oh9aUwaeqIg';
+        const style = {
+            version: 8,
+            imports: [
+                {
+                    id: 'basemap',
+                    url: 'mapbox://styles/mapbox/standard',
+                    config: {
+                        lightPreset: 'dusk',
+                        showPointofInterestLabels: false,
+                        showPlaceLabels: false,
+                        showRoadLabels: false
+                    }
+                }
+            ],
+            sources: {
+                'mapbox-dem': {
+                    type: 'raster-dem',
+                    url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                    tileSize: 512,
+                    maxzoom: 14
+                },
+                // Add GeoJSON source with locations of wind turbines
+                //
+                // Data is structured as following sample entry
+                // {
+                //     "id": 1,
+                //     "type": "Feature",
+                //     "properties": {
+                //         "turbine_id": "ALP-01",
+                //         "status": "ok"
+                //     },
+                //     "geometry": {
+                //         "coordinates": [
+                //             ...
+                //         ],
+                //         "type": "Point"
+                //     }
+                // }
+                'wind-turbine-source': {
+                    'type': 'geojson',
+                    'data': 'api/tracks/66'
+                }
+            },
+            terrain: {
+                source: 'mapbox-dem',
+                exaggeration: 2
+            },
+            models: {
+                // Add gltf model of turbine to be used by model layer
+                'turbine':
+                    'https://docs.mapbox.com/mapbox-gl-js/assets/wind_turbine_static.glb'
+            },
+            layers: [
+                // Add wind-turbine-source GeoJSON as source for model layer
+                // Model instance is added for each feature.
+                {
+                    'type': 'model',
+                    'source': 'wind-turbine-source',
+                    'paint': {
+                        'model-scale': [1, 1, 1],
+                        // Set model mix color to red and set mix intensity based on a features 'status' property.
+                        // If a wind tubines status is not 'ok', the model is tinted with 'model-color' property
+                        'model-color': '#ff4100',
+                        'model-color-mix-intensity': [
+                            'match',
+                            ['get', 'status'],
+                            'ok',
+                            ['literal', 0.0],
+                            ['literal', 1.0]
+                        ],
+                        'model-rotation': [0, 0, 100]
+                    },
+                    'id': 'turbine-models',
+                    'layout': {
+                        'model-id': 'turbine'
+                    }
+                },
+                // Add symbol layer to display turbine IDs and status as text labels
+                // Label is only shown for features when their status is not 'ok'.
+                {
+                    'type': 'symbol',
+                    'source': 'wind-turbine-source',
+                    'id': 'turbine-labels',
+                    'filter': ['!=', ['get', 'status'], 'ok'],
+                    'layout': {
+                        'text-field': [
+                            'format',
+                            ['get', 'turbine_id'],
+                            { 'font-scale': 1.2, 'text-color': '#ffffff' },
+                            '\n',
+                            {},
+                            ['get', 'status'],
+                            { 'font-scale': 0.9, 'text-color': '#ffffff' }
+                        ],
+                        'text-font': [
+                            'Open Sans Semibold',
+                            'Arial Unicode MS Bold'
+                        ],
+                        'text-size': 12,
+                        'text-anchor': 'top'
+                    },
+                    'paint': {
+                        'text-color': '#ff4100',
+                        'text-halo-color': '#aa0000',
+                        'text-halo-width': 2
+                    }
+                }
+            ]
+        };
+
+        const map = (window.map = new mapboxgl.Map({
+            container: 'map',
+            projection: 'globe',
+            style: style,
+            center: [7.072584, 47.065591],
+            zoom: 15.2,
+            bearing: 152.2,
+            pitch: 74
+        }));
+    </script>
+
+</body>
+
+</html>

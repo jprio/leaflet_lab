@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>3D Terrain</title>
+    <meta property="og:description" content="Go beyond hillshade and show elevation in actual 3D." />
+    <meta property="og:created" content="2023-06-27" />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js'></script>
+    <script src="https://unpkg.com/browse/@stadiamaps/maplibre-search-box/dist/maplibre-search-box.umd.js"
+        type="application/javascript"></script>
+    <script src="https://unpkg.com/@stadiamaps/maplibre-search-box/dist/maplibre-search-box.umd.js"></script>
+    <link href="https://unpkg.com/@stadiamaps/maplibre-search-box/dist/maplibre-search-box.css" rel="stylesheet" />
+    <!-- <script src="https://unpkg.com/maplibre-gl-style-flipper@1.0.9/index.js"></script> -->
+    <script src="https://unpkg.com/maplibre-contour@0.0.5/dist/index.min.js"></script>
+    <script src="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.umd.min.js"></script>
+    <link href="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.css" rel="stylesheet" />
+    <link href="https://unpkg.com/maplibre-gl-layer-manager@latest/src/layer-manager.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl-layer-manager@latest/src/layer-manager.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <!-- <script src="../dist/maplibre-gl-layers-control.min.js"></script> -->
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body,
+        #map {
+            height: 100%;
+        }
+    </style>
+    <style>
+        .maplibregl-ctrl-basemaps {
+            display: flex;
+            flex-direction: row;
+            pointer-events: auto;
+            bottom: 15px;
+            position: relative;
+        }
+
+        .maplibregl-ctrl-basemaps.reverse {
+            flex-direction: row-reverse;
+        }
+
+        .maplibregl-ctrl-basemaps.column {
+            flex-direction: column;
+        }
+
+        .maplibregl-ctrl-basemaps.column.reverse {
+            flex-direction: column-reverse;
+        }
+
+        .maplibregl-ctrl-basemaps .basemap {
+            width: 64px;
+            height: 64px;
+            margin: 2px;
+            border: 2px solid #ccc;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+            cursor: pointer;
+        }
+
+        .maplibregl-ctrl-basemaps .basemap.active {
+            border-color: orange;
+            box-shadow: 2px 2px 4px #000;
+        }
+
+        .maplibregl-ctrl-basemaps.closed .basemap {
+            display: none;
+        }
+
+        .maplibregl-ctrl-basemaps.closed .basemap.active {
+            display: block;
+            border: 2px solid #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        // import { LayerManager, LayersControl } from "maplibre-gl-layer-manager";
+        maptilersdk.config.apiKey = 'TJBqVnX8a4CMqkunq4W0';
+        const demSource = new mlcontour.DemSource({
+            url: 'https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=TJBqVnX8a4CMqkunq4W0',
+            encoding: 'mapbox',
+            maxzoom: 12,
+            // offload contour line computation to a web worker
+            worker: true
+        });
+
+        const baseMaps = {
+            "OSM": {
+                id: "OSM",
+                img: "https://cloud.maptiler.com/static/img/maps/streets-v4.png",
+                url: 'https://tiles.mapterhorn.com/tilejson.json'
+            },
+            "WINTER": {
+                id: "WNTER",
+                img: "https://cloud.maptiler.com/static/img/maps/winter-v4.png",
+                url: 'https://tiles.mapterhorn.com/tilejson.json'
+
+            },
+            "HYBRID": {
+                id: "HYBRID",
+                img: "https://cloud.maptiler.com/static/img/maps/hybrid-v4.png",
+                url: 'https://demotiles.maplibre.org/globe.json'
+
+            }
+        }
+        const initialStyle = baseMaps[Object.keys(baseMaps)[0]];
+        console.log('initialStyle', initialStyle);
+        // console.log(initialStyle);
+        demSource.setupMaplibre(maplibregl);
+
+        const search_control = new maplibreSearchBox.MapLibreSearchControl({
+            useMapFocusPoint: true,
+            onResultSelected: feature => {
+                console.log(feature.geometry.coordinates);
+            }
+        });
+        console.log("initial style", initialStyle['url']);
+        const map = new maplibregl.Map({
+            container: 'map',
+            zoom: 12,
+            center: [11.39085, 47.27574],
+            pitch: 70,
+            hash: true,
+            style: initialStyle['url'],
+            // style: initialStyle,
+
+
+            style: {
+                version: 8,
+                layers: [
+                    {
+                        id: 'osm',
+                        type: 'raster',
+                        source: 'osm'
+                    },
+                    {
+                        id: 'hills',
+                        type: 'hillshade',
+                        tiles: [demSource.sharedDemProtocolUrl],
+                        source: 'hillshadeSource',
+                        layout: { visibility: 'visible' },
+                        paint: { 'hillshade-shadow-color': '#473B24' }
+                    },
+                    {
+                        id: 'contours',
+                        type: 'line',
+                        // source: 'contourSourceFeet',
+                        source: 'mapTilerContours',
+                        'source-layer': 'contour',
+                        paint: {
+                            'line-opacity': 0.5,
+                            // "major" contours have level=1, "minor" have level=0
+                            'line-width': ['match', ['get', 'level'], 1, 1, 0.5]
+                        }
+                    },
+                    {
+                        id: 'contour-text',
+                        type: 'symbol',
+                        source: 'mapTilerContours',
+                        // source: 'contourSourceFeet',
+                        'source-layer': 'contour',
+                        filter: ['>', ['get', 'level'], 0],
+                        paint: {
+                            'text-halo-color': 'white',
+                            'text-halo-width': 1
+                        },
+                        layout: {
+                            'symbol-placement': 'line',
+                            'text-size': 10,
+                            'text-field': [
+                                'concat',
+                                ['number-format', ['get', 'height'], {}],
+                                '\''
+                            ],
+                            'text-font': ['Noto Sans Bold']
+                        }
+                    }
+                ],
+                sources: {
+                    osm: {
+                        type: 'raster',
+                        tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                        tileSize: 256,
+                        attribution: '&copy; OpenStreetMap Contributors',
+                        maxzoom: 19
+                    },
+                    // Use a different source for terrain and hillshade layers, to improve render quality
+                    terrainSource: {
+                        type: 'raster-dem',
+                        url: 'https://tiles.mapterhorn.com/tilejson.json'
+                    },
+                    hillshadeSource: {
+                        type: 'raster-dem',
+                        url: 'https://tiles.mapterhorn.com/tilejson.json'
+                    },
+                    contourSourceFeet: {
+                        type: 'vector',
+                        tiles: [
+                            demSource.contourProtocolUrl({
+                                // meters to feet
+                                multiplier: 3.28084,
+                                overzoom: 1,
+                                thresholds: {
+                                    // zoom: [minor, major]
+                                    11: [200, 1000],
+                                    12: [100, 500],
+                                    13: [100, 500],
+                                    14: [50, 200],
+                                    15: [20, 100]
+                                },
+                                elevationKey: 'ele',
+                                levelKey: 'level',
+                                contourLayer: 'contours'
+                            })
+                        ],
+                        maxzoom: 15
+                    },
+                    mapTilerContours: {
+                        type: 'vector',
+                        url: 'https://api.maptiler.com/tiles/contours/tiles.json?key=MYvprWBvg0uYZw2cDRh3' // Replace with free key
+                    }
+                },
+                terrain: {
+                    source: 'terrainSource',
+                    exaggeration: 1
+                },
+                sky: {}
+            },
+            maxZoom: 18,
+            maxPitch: 85
+        });
+
+
+
+        map.addControl(search_control, "top-left");
+
+        map.addControl(
+            new maplibregl.NavigationControl({
+                visualizePitch: true,
+                showZoom: true,
+                showCompass: true
+            })
+        );
+
+        map.addControl(
+            new maplibregl.TerrainControl({
+                source: 'terrainSource',
+                exaggeration: 1
+            })
+        );
+
+        map.on('load', () => {
+            const layerManager = new LayerManager({
+                layers: [
+                    {
+                        id: 'osm',
+                    },
+                    {
+                        id: 'hills',
+                    },
+                    {
+                        id: 'contours',
+                    },
+                    {
+                        id: 'contour-text',
+                    }
+                ],
+                position: "top-left",
+                collapsed: false,
+            });
+
+            map.addControl(layerManager, "top-left");
+            map.addSource('route1', {
+                'type': 'geojson',
+                'data': 'api/tracks/133'
+            });
+            map.addLayer({
+                'id': 'route1',
+                'type': 'line',
+                'source': 'route1',
+                'layout': {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                'paint': {
+                    'line-color': '#ff0000',
+                    'line-width': 8,
+                    'line-opacity': 0.5
+                }
+            });
+        });
+        // let layersControl = new LayersControl({
+        //     title: 'Layers',
+        // });
+        // map.addControl(layersControl, "bottom-left");
+        class layerSwitcherControl {
+
+            constructor(options) {
+                this._options = { ...options };
+                this._container = document.createElement("div");
+                this._container.classList.add("maplibregl-ctrl");
+                this._container.classList.add("maplibregl-ctrl-basemaps");
+                // this._container.classList.add("closed");
+
+                switch (this._options.expandDirection || "right") {
+                    case "top":
+                        this._container.classList.add("reverse");
+                    case "down":
+                        this._container.classList.add("column");
+                        break;
+                    case "left":
+                        this._container.classList.add("reverse");
+                    case "right":
+                        this._container.classList.add("row");
+                }
+                this._container.addEventListener("mouseenter", () => {
+                    this._container.classList.remove("closed");
+                });
+                this._container.addEventListener("mouseleave", () => {
+                    // this._container.classList.add("closed");
+                });
+            }
+
+            onAdd(map) {
+                this._map = map;
+                const basemaps = this._options.basemaps;
+                Object.keys(basemaps).forEach((layerId) => {
+                    // console.log('layerId', layerId);
+                    const base = basemaps[layerId];
+                    const basemapContainer = document.createElement("img");
+                    basemapContainer.src = base.img;
+                    basemapContainer.classList.add("basemap");
+                    basemapContainer.dataset.id = layerId;
+                    basemapContainer.addEventListener("click", () => {
+                        console.log('basemap clicked', base['url']);
+                        console.log(this._container)
+                        const activeElement = this._container.querySelector(".active");
+                        activeElement.classList.remove("active");
+                        basemapContainer.classList.add("active");
+                        map.setStyle(base['url'], { version: 8 });
+                    });
+                    basemapContainer.classList.add("hidden");
+                    this._container.appendChild(basemapContainer);
+                    console.log('initial basemap id', this._options.initialBasemap.id);
+                    console.log('current layerId', layerId);
+                    if (this._options.initialBasemap.id === layerId) {
+                        basemapContainer.classList.add("active");
+                    }
+                });
+                return this._container;
+            }
+
+            onRemove() {
+                this._container.parentNode?.removeChild(this._container);
+                delete this._map;
+            }
+        }
+
+        map.addControl(new layerSwitcherControl({ basemaps: baseMaps, initialBasemap: initialStyle }), 'bottom-left');
+
+
+        map.on('click', 'route1', (e) => {
+            const coordinates = e.features[0].geometry.coordinates.slice();
+
+            // Ensure that if the map is zoomed out such that multiple
+            // copies of the feature are visible, the popup appears
+            // over the copy being pointed to.
+            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+            }
+            console.log(coordinates);
+
+            // Accéder aux propriétés (ex: 'nom', 'description')
+            const props = e.features[0].properties;
+
+            const description = `<strong>${props.nom}</strong><p>${props.description}</p>`;
+
+            new maplibregl.Popup()
+                .setLngLat(e.lngLat).setHTML(description)
+                .addTo(map);
+        });
+        map.on('mouseenter', (e) => {
+            map.getCanvas().style.cursor = 'pointer'
+        })
+        map.on('mouseleave', (e) => {
+            map.getCanvas().style.cursor = ''
+        })
+        // map.on('mouseenter', 'route1', () => {
+        //     map.getCanvas().style.cursor = 'pointer'
+        // })
+        // map.on('mouseleave', 'route1', () => {
+        //     map.getCanvas().style.cursor = ''
+        // })
+    </script>
+</body>
+
+</html>

@@ -227,7 +227,22 @@ def view_collection(collection_id):
     return render_template('collection.html')
 
 
+@app.route('/mapbox')
+def mapbox():
+    return render_template('mapbox.html')
+
+
+@app.route('/maplibre')
+def maplibre():
+    return render_template('maplibre.html')
+
+
+@app.route('/cesiumjs')
+def cesiumjs():
+    return render_template('cesiumjs.html')
+
 # ======================== TRAVEL WISHES ROUTES ========================
+
 
 @app.route('/travel-wishes')
 def travel_wishes():

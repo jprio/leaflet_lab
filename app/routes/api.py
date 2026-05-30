@@ -339,6 +339,42 @@ def update_track(track_id):
     return jsonify({'message': 'Track updated successfully'}), 200
 
 
+@bp.route('/tracks/<int:track_id>', methods=['GET'])
+def get_track(track_id):
+    if 'user' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    sql = f"""
+        SELECT *
+        FROM gpx_tracks
+        WHERE id={track_id}
+        """
+    db_session = db.session
+    with db_session.connection() as conn:
+
+        gdf_tracks = gpd.GeoDataFrame.from_postgis(sql, con=conn)
+        if gdf_tracks.empty:
+            return jsonify({'error': 'Track not found'}), 404
+        try:
+            gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+            gdf_tracks['duration'] = 0
+            gdf_tracks['duration'] = (
+                gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+            gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+            gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            print(f"Error formatting start_time or end_time: {e}")
+            gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
+            gdf_tracks['link'] = gdf_tracks['link'].fillna('')
+            gdf_tracks['comment'] = gdf_tracks['comment'].str.replace(
+                '\\r\\n', '<br>', regex=False)
+
+        return gdf_tracks.to_json(), 200
+
+
 @bp.route('/tracks/<int:track_id>', methods=['DELETE'])
 def delete_track(track_id):
     if 'user' not in session:

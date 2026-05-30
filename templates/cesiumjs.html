@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <!-- Include the CesiumJS JavaScript and CSS files -->
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.141/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.141/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+</head>
+
+<body>
+    <div id="cesiumContainer"></div>
+    <script type="module">
+        // Your access token can be found at: https://ion.cesium.com/tokens.
+        // This is the default access token from your ion account
+
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiNTJkZGViOS0yMDQ0LTQ1Y2MtOTJkYy1hZmM2YTZkZWY0YjUiLCJpZCI6NDM2MDE4LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3Nzk2ODM5NzF9.xGw5YY8ibsLhutYSx2Cwdx2qnIPVZ3Tja4Kx4iaU0AA';
+
+        // Initialize the Cesium Viewer in the HTML element with the `cesiumContainer` ID.
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            terrain: Cesium.Terrain.fromWorldTerrain(),
+            sceneMode: Cesium.SceneMode.SCENE3D
+        });
+
+        Cesium.GeoJsonDataSource.load('api/tracks/59').then(function (dataSource) {
+            // Add the entire data source to the viewer
+            viewer.dataSources.add(dataSource);
+
+            // Optional: Zoom to the data
+            viewer.zoomTo(dataSource);
+        });
+        Cesium.GeoJsonDataSource.load('api/tracks/133', {
+            markerColor: Cesium.Color.RED,     // Default point/pin color
+            stroke: Cesium.Color.BLUE,          // Default polyline/polygon outline color
+            strokeWidth: 8,                     // Default outline width
+            fill: Cesium.Color.GREEN,          // Default polygon interior color
+
+        }).then(function (dataSource) {
+
+
+            // Add the entire data source to the viewer
+            viewer.dataSources.add(dataSource);
+
+            // Optional: Zoom to the data
+            viewer.zoomTo(dataSource);
+        });
+
+        // Add Cesium OSM Buildings, a global 3D buildings layer.
+        const buildingTileset = await Cesium.createOsmBuildingsAsync();
+        viewer.scene.primitives.add(buildingTileset);   
+    </script>
+    </div>
+</body>
+
+</html>
