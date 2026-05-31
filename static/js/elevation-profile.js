@@ -107,40 +107,20 @@ function lonLatToPixelInTile(lon, lat, z) {
     return { z, tx, ty, px: x, py: y };
 }
 
-const tileCache = new Map();
-
-async function fetchTileImage(z, x, y) {
-    const key = `${z}/${x}/${y}`;
-    if (tileCache.has(key)) return tileCache.get(key);
-    const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    const p = new Promise((resolve, reject) => {
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-    });
-    img.src = url;
-    const loaded = await p;
-    tileCache.set(key, loaded);
-    return loaded;
-}
 
 const tmpCanvas = document.createElement('canvas');
 tmpCanvas.width = 256; tmpCanvas.height = 256;
 const tmpCtx = tmpCanvas.getContext('2d');
 
-async function getElevationAt(lon, lat, z = 13) {
-    const { z: zz, tx, ty, px, py } = lonLatToPixelInTile(lon, lat, z);
-    try {
-        const img = await fetchTileImage(zz, tx, ty);
-        tmpCtx.clearRect(0, 0, 256, 256);
-        tmpCtx.drawImage(img, 0, 0);
-        const d = tmpCtx.getImageData(px, py, 1, 1).data;
-        return terrariumDecode(d[0], d[1], d[2]);
-    } catch (err) {
-        console.warn('Tile fetch/read failed', err);
-        return null;
-    }
+async function getElevationAt(lon, lat, z = 10) {
+    // Query terrain for elevation
+    const elevation = map.terrain.getElevationForLngLatZoom(
+        new maplibregl.LngLat(lon, lat),
+        13
+    );
+    // console.log(`Elevation at (${lon.toFixed(5)}, ${lat.toFixed(5)}) for zoom ${map.getZoom()}:`, elevation);
+    return elevation !== undefined ? elevation : null;
+
 }
 
 function haversine([lon1, lat1], [lon2, lat2]) {
@@ -157,9 +137,12 @@ async function sampleLineElevations(coordinates, samples = null) {
     const pts = coordinates;
     const segs = [];
     let total = 0;
+    const hasGeoZ = pts.every((pt) => Array.isArray(pt) && pt.length >= 3 && typeof pt[2] === 'number');
+
     for (let i = 1; i < pts.length; i++) {
         const d = haversine([pts[i - 1][0], pts[i - 1][1]], [pts[i][0], pts[i][1]]);
-        segs.push({ from: pts[i - 1], to: pts[i], dist: d });
+        const dz = hasGeoZ ? (pts[i][2] - pts[i - 1][2]) : null;
+        segs.push({ from: pts[i - 1], to: pts[i], dist: d, dz });
         total += d;
     }
     const res = [];
@@ -176,23 +159,35 @@ async function sampleLineElevations(coordinates, samples = null) {
         const target = t * total;
         let acc = 0;
         for (const seg of segs) {
-            if (acc + seg.dist >= target) {
+            if (acc + seg.dist >= target || seg === segs[segs.length - 1]) {
                 const remain = target - acc;
                 const frac = seg.dist === 0 ? 0 : remain / seg.dist;
                 const lon = seg.from[0] + (seg.to[0] - seg.from[0]) * frac;
                 const lat = seg.from[1] + (seg.to[1] - seg.from[1]) * frac;
-                res.push([lon, lat, t * total]);
+                const distance = t * total;
+                let elevation = null;
+                if (hasGeoZ) {
+                    elevation = seg.from[2] + dz * frac;
+                    if (elevation === null) {
+                        elevation = seg.from[2];
+                    }
+                }
+                res.push({ lon, lat, distance, elevation });
                 break;
             }
             acc += seg.dist;
         }
     }
 
+    if (hasGeoZ) {
+        return res;
+    }
+
     const elevations = [];
     for (let i = 0; i < res.length; i++) {
-        const lon = res[i][0], lat = res[i][1];
+        const lon = res[i].lon, lat = res[i].lat;
         const elev = await getElevationAt(lon, lat, 13);
-        elevations.push({ lon, lat, distance: res[i][2], elevation: elev });
+        elevations.push({ lon, lat, distance: res[i].distance, elevation: elev });
     }
     return elevations;
 }
@@ -364,11 +359,12 @@ function renderProfile(elevations, featureProps) {
 async function showElevationProfile(feature) {
     if (!feature || !feature.geometry) return;
     let coords = feature.geometry.coordinates;
-    if (feature.geometry.type === 'MultiLineString') {
+    console.log('Feature coordinates:', coords);
+    if (feature.geometry.type === 'MultiLineString' || feature.geometry.type === 'MultiLineSring') {
         coords = coords.flat();
     }
-    const pts = coords.map(c => [c[0], c[1]]);
-    const elevations = await sampleLineElevations(pts);
+    const elevations = await sampleLineElevations(coords);
+    console.log('Elevations:', elevations);
     currentTrailFeature = feature;
     renderProfile(elevations, feature.properties || {});
     setupProfileHoverInteraction(elevations);

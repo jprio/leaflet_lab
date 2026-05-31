@@ -48,3 +48,6 @@ Run :
 - use cloud build for CI/CD
 - genrate availability report with lighthouse and webpagetest
 - monitor with google cloud monitoring and error reporting
+
+Used APIs :
+- google maps api for geocoding and places search

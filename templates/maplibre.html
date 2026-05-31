@@ -25,6 +25,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='trail.css') }}" />
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <script>
+        function openForm() {
+            document.querySelector('#myForm').style.display = "block";
+        }
+        function closeForm() {
+            document.querySelector('#myForm').style.display = "none";
+        }
+    </script>
+
     <style>
         body {
             margin: 0;
@@ -118,7 +127,7 @@
         #track-filters {
             position: absolute;
             top: 100px;
-            left: 14px;
+            left: 354px;
             z-index: 1000;
             background: rgba(255, 255, 255, 0.96);
             border: 1px solid #ddd;
@@ -200,10 +209,96 @@
             display: block;
         }
 
+        #map-and-sidebar {
+            display: flex;
+            height: 90%;
+            min-height: 90%;
+        }
+
+        #track-sidebar {
+            width: 340px;
+            min-width: 320px;
+            background: rgba(255, 255, 255, 0.98);
+            border-right: 1px solid #ddd;
+            box-shadow: 3px 0 18px rgba(0, 0, 0, 0.08);
+            padding: 18px 16px;
+            overflow-y: auto;
+            z-index: 999;
+        }
+
+        #track-sidebar h2 {
+            margin-top: 0;
+            margin-bottom: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #222;
+        }
+
+        .track-item {
+            padding: 14px;
+            margin-bottom: 14px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 14px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .track-item h4 {
+            margin: 0 0 10px;
+            font-size: 15px;
+            line-height: 1.3;
+            color: #111;
+        }
+
+        .track-attr {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+            color: #555;
+            font-size: 13px;
+        }
+
+        .track-attr .attr-icon {
+            width: 18px;
+            height: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .track-item {
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+
+        .track-item:hover {
+            cursor: pointer;
+            background: #f5fbff;
+            transform: translateX(1px);
+        }
+
+        .track-item.selected {
+            border-color: #4caf50;
+            background: #edf8f1;
+        }
+
+        #track-sidebar-empty {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-top: 10px;
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+
         #open-track-filters-button {
             position: absolute;
             top: 14px;
-            left: 14px;
+            left: 354px;
             z-index: 1002;
             padding: 8px 12px;
             border-radius: 8px;
@@ -325,7 +420,15 @@
         </div>
     </header>
 
-    <div id="map"></div>
+    <div id="map-and-sidebar">
+        <aside id="track-sidebar">
+            <h2>Traces affichées</h2>
+            <div id="track-sidebar-list">
+                <div id="track-sidebar-empty">Aucune trace affichée.</div>
+            </div>
+        </aside>
+        <div id="map"></div>
+    </div>
     <button id="open-track-filters-button" class="hidden" type="button">Filtres</button>
     <div id="track-filters">
         <div class="filter-header">
@@ -333,6 +436,12 @@
             <button id="toggle-track-filters" class="secondary toggle" type="button">Masquer</button>
         </div>
         <div id="track-filters-panel">
+            <div class="filter-row">
+                <label for="filter-collection">Collection</label>
+                <select id="filter-collection">
+                    <option value="">Toutes les collections</option>
+                </select>
+            </div>
             <div class="filter-row">
                 <label for="filter-name">Nom</label>
                 <input id="filter-name" type="search" list="track-name-list" placeholder="Recherche de nom..." />
@@ -430,6 +539,7 @@
 
         let currentTracksGeoJSON = null;
         let currentFilterState = {
+            collectionId: '',
             name: '',
             type: '',
             minLength: null,
@@ -438,6 +548,7 @@
 
         const filterNameInput = document.getElementById('filter-name');
         const filterTypeInput = document.getElementById('filter-type');
+        const filterCollectionSelect = document.getElementById('filter-collection');
         const filterTypeList = document.getElementById('track-type-list');
         const filterNameList = document.getElementById('track-name-list');
         const trackFiltersPanel = document.getElementById('track-filters-panel');
@@ -467,25 +578,29 @@
             updateFilterButtons();
         });
 
+        filterCollectionSelect.addEventListener('change', () => {
+            currentFilterState = getFilterState();
+            redraw();
+        });
+
         clearFilterBtn.addEventListener('click', () => {
+            filterCollectionSelect.value = '';
             filterNameInput.value = '';
             filterTypeInput.value = '';
             filterMinInput.value = '';
             filterMaxInput.value = '';
             currentFilterState = getFilterState();
-            if (currentTracksGeoJSON) {
-                map.getSource('trails').setData(applyTrackFilters(currentTracksGeoJSON));
-            }
+            redraw();
         });
+
         applyFilterBtn.addEventListener('click', () => {
             currentFilterState = getFilterState();
-            if (currentTracksGeoJSON) {
-                map.getSource('trails').setData(applyTrackFilters(currentTracksGeoJSON));
-            }
+            redraw();
         });
 
         function getFilterState() {
             return {
+                collectionId: filterCollectionSelect.value,
                 name: filterNameInput.value.trim().toLowerCase(),
                 type: filterTypeInput.value.trim().toLowerCase(),
                 minLength: filterMinInput.value ? parseFloat(filterMinInput.value) * 1000 : null,
@@ -557,6 +672,81 @@
                 filterNameList.appendChild(option);
             });
         }
+
+        function populateCollectionOptions(collections) {
+            filterCollectionSelect.innerHTML = '<option value="">Toutes les collections</option>';
+            collections.forEach((collection) => {
+                const option = document.createElement('option');
+                option.value = collection.id;
+                option.textContent = collection.name;
+                filterCollectionSelect.appendChild(option);
+            });
+        }
+
+        function renderTrackSidebar(geojson) {
+            const list = document.getElementById('track-sidebar-list');
+            if (!list) return;
+            const features = geojson?.features || [];
+            if (!features.length) {
+                list.innerHTML = '<div id="track-sidebar-empty">Aucune trace affichée.</div>';
+                return;
+            }
+            list.innerHTML = '';
+            features.forEach((feature) => {
+                const props = feature.properties || {};
+                const item = document.createElement('div');
+                item.className = 'track-item';
+
+                const title = document.createElement('h4');
+                title.textContent = props.name || 'Sans nom';
+                item.appendChild(title);
+
+                const rows = [
+                    { icon: '📏', label: props.length ? `${(props.length / 1000).toFixed(1)} km` : 'N/A' },
+                    { icon: '⛰️', label: props.elevation_gain ? `${props.elevation_gain} m gain` : 'N/A' },
+                    { icon: '🧭', label: props.type || 'N/A' }
+                ];
+
+                rows.forEach(({ icon, label }) => {
+                    const attr = document.createElement('div');
+                    attr.className = 'track-attr';
+                    attr.innerHTML = `<span class="attr-icon">${icon}</span><span>${label}</span>`;
+                    item.appendChild(attr);
+                });
+
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('.track-item.selected').forEach((el) => el.classList.remove('selected'));
+                    item.classList.add('selected');
+                    const bounds = new maplibregl.LngLatBounds();
+                    const coords = feature.geometry?.coordinates || [];
+                    if (feature.geometry?.type === 'LineString') {
+                        coords.forEach((coord) => bounds.extend(coord));
+                    } else if (feature.geometry?.type === 'MultiLineString') {
+                        coords.forEach((line) => line.forEach((coord) => bounds.extend(coord)));
+                    } else {
+                        bounds.extend(coords);
+                    }
+                    if (!bounds.isEmpty()) {
+                        map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 600 });
+                    }
+                });
+
+                list.appendChild(item);
+            });
+        }
+
+        function loadCollectionOptions() {
+            fetch('/api/collections')
+                .then((response) => response.ok ? response.json() : [])
+                .then((collections) => {
+                    populateCollectionOptions(collections || []);
+                })
+                .catch((error) => {
+                    console.warn('Unable to load collections:', error);
+                });
+        }
+
+        loadCollectionOptions();
 
         const search_control = new maplibreSearchBox.MapLibreSearchControl({
             useMapFocusPoint: true,
@@ -716,9 +906,14 @@
             }
             // console.log(coordinates);
 
+            const feats = map.queryRenderedFeatures(e.point, {
+                layers: ['trails'] // Optionnel : limiter à des couches spécifiques
+            });
+            console.log("Features at click point:", feats[0].geometry.coordinates);
             // Accéder aux propriétés (ex: 'nom', 'description')
             const props = e.features[0].properties;
-            console.log(props);
+            // console.log("e.features[0]:", e.features[0]);
+            // console.log(e.features[0].geometry.coordinates);
             const description = '<strong>' + props.name + '</strong>'
                 + '<p>'
                 + 'Length : ' + props.length + ' <br>'
@@ -731,7 +926,7 @@
             new maplibregl.Popup()
                 .setLngLat(e.lngLat).setHTML(description)
                 .addTo(map);
-
+            console.log("Clicked feature:", e.features[0].geometry.coordinates);
             showElevationProfile(e.features[0]);
         });
         let hoveredStateId = null;
@@ -788,13 +983,20 @@
             ne_lng = Math.round(ne.lng * 10000) / 10000;
             sw_lat = Math.round(sw.lat * 10000) / 10000;
             sw_lng = Math.round(sw.lng * 10000) / 10000;
-            fetch('/api/find_tracks?NW_lon=' + sw_lng + '&SE_lon=' + ne_lng + '&NW_lat=' + ne_lat + '&SE_lat=' + sw_lat)
+            const collectionId = currentFilterState.collectionId;
+            const url = collectionId ? '/api/collection_tracks/' + collectionId : '/api/find_tracks?NW_lon=' + sw_lng + '&SE_lon=' + ne_lng + '&NW_lat=' + ne_lat + '&SE_lat=' + sw_lat;
+            fetch(url)
                 .then(function (response) { return response.json(); })
                 .then(function (data) {
+                    console.log("data", data);
                     currentTracksGeoJSON = data;
                     populateTrackTypeOptions(data);
                     populateTrackNameOptions(data);
-                    map.getSource("trails").setData(applyTrackFilters(data));
+                    const filtered = applyTrackFilters(data);
+                    console.log("Filtered tracks:", filtered);
+                    map.getSource("trails").setData(filtered);
+                    console.log("Map data:", map.getSource("trails")._data);
+                    renderTrackSidebar(filtered);
                 });
         };
 

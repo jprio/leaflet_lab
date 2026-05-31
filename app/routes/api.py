@@ -122,6 +122,30 @@ def create_collection():
         return jsonify({'error': 'Failed to create collection'}), 500
 
 
+@bp.route('/collections', methods=['GET'])
+def list_collections():
+    if 'user' not in session:
+        return jsonify([])
+
+    try:
+        user_session = db.session
+        current_user = user_session.query(User).filter_by(
+            uuid=session['user'].get('sub')).first()
+        if not current_user:
+            user_session.close()
+            return jsonify([])
+
+        collections = [
+            {'id': collection.id, 'name': collection.name}
+            for collection in current_user.collections
+        ]
+        user_session.close()
+        return jsonify(collections)
+    except Exception as e:
+        print(f"Error fetching collections: {e}")
+        return jsonify([])
+
+
 @bp.route('/collections/info/<int:collection_id>', methods=['GET'])
 def get_collection_infos(collection_id):
     if 'user' not in session:
@@ -341,6 +365,7 @@ def update_track(track_id):
 
 @bp.route('/tracks/<int:track_id>', methods=['GET'])
 def get_track(track_id):
+    print(f"Fetching track with id: {track_id}")
     if 'user' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
