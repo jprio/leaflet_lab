@@ -92,7 +92,7 @@ def unauthorized():
 @app.route("/")
 def index():
     # return redirect("/alltrail")
-    return render_template("index.html")
+    return render_template("maplibre.html")
 
 
 def allowed_file(filename):
@@ -103,7 +103,6 @@ def allowed_file(filename):
 @app.route('/upload', methods=['POST'])
 def upload_file():
     owner = session['user']['sub']
-    print(request.form)
     engine = persistence.get_engine()
     # check if the post request has the file part
     if 'file' not in request.files:
@@ -122,7 +121,7 @@ def upload_file():
         filename = secure_filename(file.filename)
         Session = sessionmaker(bind=engine)
         sess = Session()
-
+        gpx.way
         gpx = gpxpy.parse(file)
         for track in gpx.tracks:
             print(track.name)
@@ -168,7 +167,6 @@ def upload_file():
             # Convert to WKT for insertion
             wkt = line_string.wkt
             print("start time " + str(start_time))
-            print(datetime.now().isoformat(timespec='seconds'))
             try:
                 new_track = GPXTrack(name=track.name, geom=WKTElement(wkt, srid=4326), owner=owner, type=type, elevation_gain=elevation_gain, elevation_loss=elevation_loss,
                                      link=link, start_time=start_time, end_time=end_time, insert_date=datetime.now().isoformat(timespec='seconds'), length=track.length_3d(), comment=comment, start_point_geo=start_point_geo)

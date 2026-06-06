@@ -85,7 +85,7 @@
         #elevation-profile-info {
             display: flex;
             gap: 20px;
-            font-size: 12px;
+            font-size: 13px;
             color: #666;
             margin-top: 8px;
             padding-top: 8px;
@@ -106,7 +106,7 @@
             color: white;
             padding: 6px 10px;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 13px;
             white-space: nowrap;
             pointer-events: none;
             z-index: 1001;
@@ -117,11 +117,17 @@
         }
 
         .elevation-stat-label {
-            font-size: 11px;
+            font-size: 13px;
             text-transform: uppercase;
             color: #999;
             font-weight: 600;
             letter-spacing: 0.5px;
+        }
+
+        .elevation-stat-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
         }
 
         #track-filters {
@@ -534,7 +540,7 @@
             google_terrain,
             google_road,
             google_sat
-        }
+        }   
         const basemapControl = new BasemapControl({ basemaps: baseLayers, initialBasemap: "google_terrain", width: "200px" });
 
         let currentTracksGeoJSON = null;
@@ -746,12 +752,46 @@
                 });
         }
 
+        function loadWaypoints() {
+            fetch('/api/waypoints')
+                .then((response) => {
+                    if (response.status === 401) {
+                        console.warn('Waypoints are available only for authenticated users.');
+                        return [];
+                    }
+                    return response.ok ? response.json() : [];
+                })
+                .then((waypoints) => {
+                    const waypointCollection = {
+                        type: 'FeatureCollection',
+                        features: (waypoints || []).map((wp) => ({
+                            type: 'Feature',
+                            properties: {
+                                id: wp.id,
+                                description: wp.description || 'Waypoint',
+                                created_at: wp.created_at || null
+                            },
+                            geometry: {
+                                type: 'Point',
+                                coordinates: [wp.lng, wp.lat]
+                            }
+                        }))
+                    };
+                    if (map.getSource('waypoints')) {
+                        map.getSource('waypoints').setData(waypointCollection);
+                    }
+                })
+                .catch((error) => {
+                    console.warn('Unable to load waypoints:', error);
+                });
+        }
+
         loadCollectionOptions();
 
         const search_control = new maplibreSearchBox.MapLibreSearchControl({
             useMapFocusPoint: true,
             onResultSelected: feature => {
-                console.log(feature.geometry.coordinates);
+                // console.log(feature.geometry.coordinates);
             }
         });
         var map = new maplibregl.Map({
@@ -855,6 +895,13 @@
                 }
             });
 
+            map.addSource('waypoints', {
+                'type': 'geojson',
+                'data': {
+                    "type": "FeatureCollection",
+                    "features": []
+                }
+            });
             map.addControl(basemapControl, 'top-right');
 
             map.addLayer({
@@ -881,6 +928,20 @@
                     'line-opacity': 0.9
                 }
             });
+
+            map.addLayer({
+                'id': 'waypoints',
+                'type': 'circle',
+                'source': 'waypoints',
+                'paint': {
+                    'circle-radius': 6,
+                    'circle-color': '#ff8c00',
+                    'circle-stroke-color': '#ffffff',
+                    'circle-stroke-width': 2,
+                    'circle-opacity': 0.95
+                }
+            });
+
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const lat = position.coords.latitude;
@@ -888,6 +949,7 @@
                     // map.flyTo({ center: [lng, lat], zoom: 12 });
                 })
 
+            loadWaypoints();
             redraw();
         });
         // let layersControl = new LayersControl({
@@ -909,7 +971,7 @@
             const feats = map.queryRenderedFeatures(e.point, {
                 layers: ['trails'] // Optionnel : limiter à des couches spécifiques
             });
-            console.log("Features at click point:", feats[0].geometry.coordinates);
+            // console.log("Features at click point:", feats[0].geometry.coordinates);
             // Accéder aux propriétés (ex: 'nom', 'description')
             const props = e.features[0].properties;
             // console.log("e.features[0]:", e.features[0]);
@@ -926,9 +988,54 @@
             new maplibregl.Popup()
                 .setLngLat(e.lngLat).setHTML(description)
                 .addTo(map);
-            console.log("Clicked feature:", e.features[0].geometry.coordinates);
+            // console.log("Clicked feature:", e.features[0].geometry.coordinates);
+            const bounds = new maplibregl.LngLatBounds();
+            const coords = e.features[0].geometry?.coordinates || [];
+            if (e.features[0].geometry?.type === 'LineString') {
+                coords.forEach((coord) => bounds.extend(coord));
+            } else if (e.features[0].geometry?.type === 'MultiLineString') {
+                coords.forEach((line) => line.forEach((coord) => bounds.extend(coord)));
+            } else {
+                bounds.extend(coords);
+            }
+            if (!bounds.isEmpty()) {
+                map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 600 });
+            }
+
+            map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 600 });
+
             showElevationProfile(e.features[0]);
         });
+
+        const waypointTooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
+
+        map.on('click', 'waypoints', (e) => {
+            const props = e.features[0].properties || {};
+            const description = '<strong>' + (props.description || 'Waypoint') + '</strong>' +
+                '<p>' +
+                (props.created_at ? 'Créé le: ' + props.created_at + '<br>' : '') +
+                '</p>';
+
+            new maplibregl.Popup()
+                .setLngLat(e.lngLat)
+                .setHTML(description)
+                .addTo(map);
+        });
+
+        map.on('mouseenter', 'waypoints', (e) => {
+            map.getCanvas().style.cursor = 'pointer';
+            const props = e.features[0].properties || {};
+            waypointTooltip
+                .setLngLat(e.lngLat)
+                .setHTML('<strong>' + (props.description || 'Waypoint') + '</strong>')
+                .addTo(map);
+        });
+
+        map.on('mouseleave', 'waypoints', () => {
+            map.getCanvas().style.cursor = '';
+            waypointTooltip.remove();
+        });
+
         let hoveredStateId = null;
 
         map.on('mouseenter', "trails", (e) => {
@@ -988,14 +1095,11 @@
             fetch(url)
                 .then(function (response) { return response.json(); })
                 .then(function (data) {
-                    console.log("data", data);
                     currentTracksGeoJSON = data;
                     populateTrackTypeOptions(data);
                     populateTrackNameOptions(data);
                     const filtered = applyTrackFilters(data);
-                    console.log("Filtered tracks:", filtered);
                     map.getSource("trails").setData(filtered);
-                    console.log("Map data:", map.getSource("trails")._data);
                     renderTrackSidebar(filtered);
                 });
         };

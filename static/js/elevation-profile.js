@@ -3,6 +3,8 @@ let currentElevations = null;
 let currentTrailFeature = null;
 let profileMarker = null;
 let elevationHoverInitialized = false;
+let currentProfileRenderMeta = null; // will hold smoothing, extents and layout
+let profileCursorEl = null;
 
 // Create profile UI elements
 const profileContainer = document.createElement('div');
@@ -14,8 +16,8 @@ profileContainer.style.bottom = '10px';
 profileContainer.style.zIndex = 999;
 profileContainer.style.padding = '16px';
 profileContainer.style.display = 'none';
-profileContainer.style.width = '420px';
-profileContainer.style.maxHeight = '320px';
+profileContainer.style.width = '1000px';
+profileContainer.style.maxHeight = '350px';
 profileContainer.style.overflowY = 'auto';
 profileContainer.style.boxSizing = 'border-box';
 
@@ -38,6 +40,20 @@ canvasContainer.appendChild(canvas);
 const hoverInfo = document.createElement('div');
 hoverInfo.id = 'elevation-profile-info-hover';
 canvasContainer.appendChild(hoverInfo);
+
+// small dot that follows the mouse on the profile canvas
+profileCursorEl = document.createElement('div');
+profileCursorEl.id = 'elevation-profile-cursor';
+profileCursorEl.style.position = 'absolute';
+profileCursorEl.style.width = '10px';
+profileCursorEl.style.height = '10px';
+profileCursorEl.style.borderRadius = '50%';
+profileCursorEl.style.background = '#4CAF50';
+profileCursorEl.style.boxShadow = '0 1px 4px rgba(0,0,0,0.25)';
+profileCursorEl.style.transform = 'translate(-50%, -50%)';
+profileCursorEl.style.pointerEvents = 'none';
+profileCursorEl.style.display = 'none';
+canvasContainer.appendChild(profileCursorEl);
 
 profileContainer.appendChild(canvasContainer);
 
@@ -77,7 +93,7 @@ ToggleProfileControl.prototype.onAdd = function (mapInstance) {
     btn.title = 'Toggle elevation profile';
     btn.textContent = 'Profile';
     btn.style.padding = '6px 8px';
-    btn.style.fontSize = '12px';
+    btn.style.fontSize = '14px';
     btn.onclick = () => {
         if (profileContainer.style.display === 'none' || !profileContainer.style.display) {
             profileContainer.style.display = 'block';
@@ -235,12 +251,17 @@ function renderProfile(elevations, featureProps) {
 
     currentElevations = elevations;
 
-    const vals = elevations.map(e => e.elevation === null ? 0 : e.elevation);
+    // Build arrays for smoothing and drawing. Use 0 where elevation missing.
+    const vals = elevations.map(e => (e && typeof e.elevation === 'number') ? e.elevation : 0);
+    const lons = elevations.map(e => e.lon || 0);
+    const lats = elevations.map(e => e.lat || 0);
+    const distances = elevations.map(e => e.distance || 0);
+
     const min = Math.min(...vals);
     const max = Math.max(...vals);
     const range = max - min || 1;
 
-    const padLeft = 45;
+    const padLeft = 65;
     const padRight = 15;
     const padTop = 15;
     const padBottom = 35;
@@ -252,7 +273,8 @@ function renderProfile(elevations, featureProps) {
 
     ctx.strokeStyle = '#e8e8e8';
     ctx.lineWidth = 1;
-    ctx.font = '11px sans-serif';
+    // larger font for altitude labels for readability
+    ctx.font = '15px sans-serif';
     ctx.fillStyle = '#999';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -268,7 +290,11 @@ function renderProfile(elevations, featureProps) {
         ctx.fillText(Math.round(elev) + ' m', padLeft - 8, y);
     }
 
+    // Smooth each numeric series so the profile and hover align
     const smoothVals = generateSmoothCurve(vals);
+    const smoothLons = generateSmoothCurve(lons);
+    const smoothLats = generateSmoothCurve(lats);
+    const smoothDistances = generateSmoothCurve(distances);
 
     ctx.beginPath();
     for (let i = 0; i < smoothVals.length; i++) {
@@ -300,7 +326,8 @@ function renderProfile(elevations, featureProps) {
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    ctx.font = '11px sans-serif';
+    // larger font for distance labels
+    ctx.font = '16px sans-serif';
     ctx.fillStyle = '#888';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -354,17 +381,25 @@ function renderProfile(elevations, featureProps) {
     `;
 
     profileContainer.style.display = 'block';
+
+    // store render meta for hover interaction
+    currentProfileRenderMeta = {
+        min, max, range,
+        padLeft, padRight, padTop, padBottom, graphW, graphH,
+        smoothVals, smoothLons, smoothLats, smoothDistances
+    };
+    // hide profile cursor initially
+    if (profileCursorEl) profileCursorEl.style.display = 'none';
 }
 
 async function showElevationProfile(feature) {
+    console.log("Generating elevation profile for feature:", feature);
     if (!feature || !feature.geometry) return;
     let coords = feature.geometry.coordinates;
-    console.log('Feature coordinates:', coords);
     if (feature.geometry.type === 'MultiLineString' || feature.geometry.type === 'MultiLineSring') {
         coords = coords.flat();
     }
     const elevations = await sampleLineElevations(coords);
-    console.log('Elevations:', elevations);
     currentTrailFeature = feature;
     renderProfile(elevations, feature.properties || {});
     setupProfileHoverInteraction(elevations);
@@ -377,26 +412,44 @@ function setupProfileHoverInteraction(elevations) {
 
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
+        if (!currentProfileRenderMeta) return;
+        const meta = currentProfileRenderMeta;
+        const cssWidth = rect.width;
+        const cssHeight = rect.height;
+        const padLeftCss = meta.padLeft * (cssWidth / 840);
+        const padRightCss = meta.padRight * (cssWidth / 840);
+        const padTopCss = meta.padTop * (cssHeight / 220);
+        const padBottomCss = meta.padBottom * (cssHeight / 220);
+        const graphW = cssWidth - padLeftCss - padRightCss;
+        const graphH = cssHeight - padTopCss - padBottomCss;
+
         const x = e.clientX - rect.left;
-        const padLeft = 45 * (rect.width / 840);
-        const padRight = 15 * (rect.width / 840);
-        const graphWidth = rect.width - padLeft - padRight;
+        if (x < padLeftCss || x > cssWidth - padRightCss) return;
+        const relX = (x - padLeftCss) / graphW;
+        const smoothLen = meta.smoothVals.length;
+        const pointIndex = Math.round(relX * (smoothLen - 1));
 
-        if (x < padLeft || x > rect.width - padRight) return;
-        const relX = (x - padLeft) / graphWidth;
-        const pointIndex = Math.round(relX * (elevations.length - 1));
+        if (pointIndex >= 0 && pointIndex < smoothLen) {
+            const lon = meta.smoothLons[pointIndex];
+            const lat = meta.smoothLats[pointIndex];
+            const elev = meta.smoothVals[pointIndex];
 
-        if (pointIndex >= 0 && pointIndex < elevations.length) {
-            const point = elevations[pointIndex];
+            // position map marker
             if (profileMarker) {
-                profileMarker.setLngLat([point.lon, point.lat]);
+                profileMarker.setLngLat([lon, lat]);
             } else {
-                profileMarker = new maplibregl.Marker({
-                    color: '#4CAF50',
-                    scale: 0.8
-                })
-                    .setLngLat([point.lon, point.lat])
+                profileMarker = new maplibregl.Marker({ color: '#4CAF50', scale: 0.8 })
+                    .setLngLat([lon, lat])
                     .addTo(map);
+            }
+
+            // position cursor on canvas container
+            const xPos = padLeftCss + (pointIndex / (smoothLen - 1)) * graphW;
+            const yPos = padTopCss + graphH * (1 - (elev - meta.min) / meta.range);
+            if (profileCursorEl) {
+                profileCursorEl.style.left = `${xPos}px`;
+                profileCursorEl.style.top = `${yPos}px`;
+                profileCursorEl.style.display = 'block';
             }
         }
     });
@@ -406,6 +459,7 @@ function setupProfileHoverInteraction(elevations) {
             profileMarker.remove();
             profileMarker = null;
         }
+        if (profileCursorEl) profileCursorEl.style.display = 'none';
     });
 }
 

@@ -1,3 +1,4 @@
+import unittest
 from dotenv import load_dotenv
 from shapely.geometry import LineString
 from geoalchemy2 import Geometry
@@ -22,243 +23,242 @@ def get_engine():
     return engine
 
 
-def conn_aiven_test():
-    conn = psycopg.connect(
-        f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+class TestAiven(unittest.TestCase):
 
-    query_sql = 'SELECT VERSION()'
+    def conn_aiven_test():
+        conn = psycopg.connect(
+            f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
 
-    cur = conn.cursor()
-    cur.execute(query_sql)
+        query_sql = 'SELECT VERSION()'
 
-    version = cur.fetchone()[0]
-    print(version)
+        cur = conn.cursor()
+        cur.execute(query_sql)
 
-    add_postgis = "CREATE EXTENSION postgis;"
-    cur.execute(add_postgis)
-    conn.commit()
+        version = cur.fetchone()[0]
+        print(version)
 
+        add_postgis = "CREATE EXTENSION postgis;"
+        cur.execute(add_postgis)
+        conn.commit()
 
-def create_tables():
-    conn = psycopg2.connect(
-        f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
-    cur = conn.cursor()
-    # cur.execute("""
-    #     CREATE TABLE IF NOT EXISTS tracks (
-    #         id SERIAL PRIMARY KEY,
-    #         geom GEOMETRY(Point, 4326)
-    #     );
-    # """)
-    # cur.execute("""DROP TABLE IF EXISTS gpx_tracks;""")
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS gpx_tracks (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255),
-            geom GEOMETRY(LINESTRING, 4326)
-        );
-    """)
-    conn.commit()
+    def create_tables(self):
+        conn = psycopg2.connect(
+            f'postgres://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+        cur = conn.cursor()
+        # cur.execute("""
+        #     CREATE TABLE IF NOT EXISTS tracks (
+        #         id SERIAL PRIMARY KEY,
+        #         geom GEOMETRY(Point, 4326)
+        #     );
+        # """)
+        # cur.execute("""DROP TABLE IF EXISTS gpx_tracks;""")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS gpx_tracks (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255),
+                geom GEOMETRY(LINESTRING, 4326)
+            );
+        """)
+        conn.commit()
 
+    def test_save_gpx(self):
+        import glob
 
-def test_save_gpx():
-    import glob
+        files = glob.glob("tests/gpx/*.gpx")
+        engine = create_engine(
+            f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
+        for file in files:
+            # 1. Charger et parser le GPX
+            with open(file, "r") as f:
+                gpx = gpxpy.parse(f)
 
-    files = glob.glob("tests/gpx/*.gpx")
-    engine = create_engine(
-        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require')
-    for file in files:
-        # 1. Charger et parser le GPX
-        with open(file, "r") as f:
-            gpx = gpxpy.parse(f)
+            # 2. Extraire les données (exemple pour les waypoints)
+            points = []
+            for track in gpx.tracks:
+                for segment in track.segments:
+                    for point in segment.points:
+                        # Création de l'élément géométrique WKT pour PostGIS
+                        wkt = f"POINT({point.longitude} {point.latitude})"
+                        points.append(WKTElement(wkt, srid=4326))
 
-        # 2. Extraire les données (exemple pour les waypoints)
-        points = []
-        for track in gpx.tracks:
-            for segment in track.segments:
-                for point in segment.points:
-                    # Création de l'élément géométrique WKT pour PostGIS
-                    wkt = f"POINT({point.longitude} {point.latitude})"
-                    points.append(WKTElement(wkt, srid=4326))
+            # 3. Insertion via GeoAlchemy2/SQLAlchemy
+            # (Supposant une session et une table 'tracks' déjà définies)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+            for track in gpx.tracks:
+                points = [(point.longitude, point.latitude)
+                          for segment in track.segments for point in segment.points]
+                line_string = LineString(points)
 
-        # 3. Insertion via GeoAlchemy2/SQLAlchemy
-        # (Supposant une session et une table 'tracks' déjà définies)
+                # Convert to WKT for insertion
+                wkt = line_string.wkt
+
+                new_track = GPXTrack(
+                    name=track.name, geom=WKTElement(wkt, srid=4326))
+                session.add(new_track)
+                print(
+                    f"Inserted track: {track.name} with {len(points)} points.")
+                session.commit()
+                # Insertion directe ou via GeoPandas.to_postgis avec dtype={'geometry': Geometry('POINT', srid=4326)}
+
+    # create_tables()
+
+    def test_postgis_to_geojson(self):
+        engine = get_engine()
+        from sqlalchemy.ext.declarative import declarative_base
+        from sqlalchemy.orm import sessionmaker
+        from geojson import Feature, FeatureCollection
+        from geoalchemy2.shape import to_shape
+
+        import geojson
+        Base = declarative_base()
+
         Session = sessionmaker(bind=engine)
         session = Session()
-        for track in gpx.tracks:
-            points = [(point.longitude, point.latitude)
-                      for segment in track.segments for point in segment.points]
-            line_string = LineString(points)
 
-            # Convert to WKT for insertion
-            wkt = line_string.wkt
+        # SELECT ST_AsGeoJSON(geom) FROM table
+        # trx=session.query(GPXTrack.name, GPXTrack.geom.ST_AsGeoJSON()).filter(
+        trx = session.query(GPXTrack.name, GPXTrack.geom).filter(
+            GPXTrack.id == 34)
+        import shapely.geometry
+        features = []
+        for name, geom in trx:
+            feature = Feature(
+                id=1,
+                geometry=shapely.geometry.mapping(to_shape(geom)),
+                properties={"name": name}
+            )
+            features.append(feature)
+            collection = FeatureCollection(features)
+            print(collection)
+            # geojson_geometry = shapely.geometry.mapping(geom_json)
+            # print(f"Track: {name}, Geometry (GeoJSON): {geom_json[:100]}")
+            # print(feature = geojson.Feature(geometry=geojson_geometry)
 
-            new_track = GPXTrack(
-                name=track.name, geom=WKTElement(wkt, srid=4326))
-            session.add(new_track)
-            print(f"Inserted track: {track.name} with {len(points)} points.")
-            session.commit()
-            # Insertion directe ou via GeoPandas.to_postgis avec dtype={'geometry': Geometry('POINT', srid=4326)}
+    def pandas_read_postgis_to_geojson(self):
+        engine = get_engine()
+        gdf = gpd.read_postgis(
+            "SELECT name, geom FROM gpx_tracks where id = 34", con=engine, geom_col='geom')
+        print(gdf.head())
+        # gdf.to_file("gpx_tracks.geojson", driver='GeoJSON')
+        print(gdf.shape)
 
-# create_tables()
+    def alchemy_test(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        import pyproj
+        from shapely.ops import transform
+        from functools import partial
+        from geoalchemy2.shape import to_shape
 
-
-def test_postgis_to_geojson():
-    engine = get_engine()
-    from sqlalchemy.ext.declarative import declarative_base
-    from sqlalchemy.orm import sessionmaker
-    from geojson import Feature, FeatureCollection
-    from geoalchemy2.shape import to_shape
-
-    import geojson
-    Base = declarative_base()
-
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    # SELECT ST_AsGeoJSON(geom) FROM table
-    # trx=session.query(GPXTrack.name, GPXTrack.geom.ST_AsGeoJSON()).filter(
-    trx = session.query(GPXTrack.name, GPXTrack.geom).filter(
-        GPXTrack.id == 34)
-    import shapely.geometry
-    features = []
-    for name, geom in trx:
-        feature = Feature(
-            id=1,
-            geometry=shapely.geometry.mapping(to_shape(geom)),
-            properties={"name": name}
+        engine = create_engine(
+            f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require',
+            echo=True,
+            plugins=["geoalchemy2"]
         )
-        features.append(feature)
-        collection = FeatureCollection(features)
-        print(collection)
-        # geojson_geometry = shapely.geometry.mapping(geom_json)
-        # print(f"Track: {name}, Geometry (GeoJSON): {geom_json[:100]}")
-        # print(feature = geojson.Feature(geometry=geojson_geometry)
 
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        locations = session.query(GPXTrack).filter(
+            GPXTrack.name.like('%Lake%')).all()
+        for location in locations:
+            print("gpx trouvé : " + str(location.name))
+            # print("geom : " + str(location.geom))
+            # print("length : " + str(type(location.geom)))
+            shapely_point = to_shape(location.geom)
+            # print("shapely_point : " + str(shapely_point))
+            print("shapely_point length : " + str(shapely_point.length*100))
+            # Transform to a projected CRS (e.g., UTM Zone 33N)
+            # project = partial(
+            #     pyproj.transform,
+            #     pyproj.Proj('EPSG:4326'),
+            #     pyproj.Proj('EPSG:32633')
+            # )
+            # line_projected = transform(project, location.geom)
 
-def pandas_read_postgis_to_geojson():
-    engine = get_engine()
-    gdf = gpd.read_postgis(
-        "SELECT name, geom FROM gpx_tracks", con=engine, geom_col='geom')
-    print(gdf.head())
-    # gdf.to_file("gpx_tracks.geojson", driver='GeoJSON')
-    print(gdf.shape)
+            # # Length is now in meters
+            # print(line_projected.length)
 
+    def alchemy_test_mean_location(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        import pandas as pd
+        engine = create_engine(
+            f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require',
+            echo=True,
+            plugins=["geoalchemy2"]
+        )
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks;"
+        # locations = session.query(GPXTrack).filter("SELECT AVG(ST_Y(geom)) AS mean_latitude FROM your_table_name;").all()
+        df_mean = pd.read_sql(query, engine.connect())
+        print(df_mean)
 
-def alchemy_test():
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    import pyproj
-    from shapely.ops import transform
-    from functools import partial
-    from geoalchemy2.shape import to_shape
+    def alchemy_test_relationship(self):
+        engine = create_engine(
+            f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require',
+            echo=True,
+            plugins=["geoalchemy2"]
+        )
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        from app.models.domain import User, Collection
+        user = session.query(User).filter_by(
+            name="Jean-Pierre Rio").first()
+        print(user)
 
-    engine = create_engine(
-        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require',
-        echo=True,
-        plugins=["geoalchemy2"]
-    )
+    def geopandas_search_test(self):
+        engine = get_engine()
 
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    locations = session.query(GPXTrack).filter(
-        GPXTrack.name.like('%Lake%')).all()
-    for location in locations:
-        print("gpx trouvé : " + str(location.name))
-        # print("geom : " + str(location.geom))
-        # print("length : " + str(type(location.geom)))
-        shapely_point = to_shape(location.geom)
-        # print("shapely_point : " + str(shapely_point))
-        print("shapely_point length : " + str(shapely_point.length*100))
-        # Transform to a projected CRS (e.g., UTM Zone 33N)
-        # project = partial(
-        #     pyproj.transform,
-        #     pyproj.Proj('EPSG:4326'),
-        #     pyproj.Proj('EPSG:32633')
-        # )
-        # line_projected = transform(project, location.geom)
+        # Filter by bounding box using SQL
+        sql = """
+        SELECT *
+        FROM gpx_tracks
+        WHERE ST_X(ST_StartPoint(geom)) BETWEEN 76.06109619140626 AND 79.14550781250001 
+        AND ST_Y(ST_StartPoint(geom)) BETWEEN 41.48800607185427 AND 42.71069600569497
+        """
+        sql2 = """
+        SELECT *
+        FROM gpx_tracks
+        WHERE ST_X(ST_StartPoint(geom)) BETWEEN 77.96447753906251 AND 78.70742797851564 
+        AND ST_Y(ST_StartPoint(geom)) BETWEEN 41.95029860413911 AND 42.56016134191609
+        """
 
-        # # Length is now in meters
-        # print(line_projected.length)
-
-
-def alchemy_test_mean_location():
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    import pandas as pd
-    engine = create_engine(
-        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require',
-        echo=True,
-        plugins=["geoalchemy2"]
-    )
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    query = "SELECT AVG(ST_Y(ST_Centroid(geom))) AS mean_latitude, AVG(ST_X(ST_Centroid(geom))) AS mean_longitude FROM gpx_tracks;"
-    # locations = session.query(GPXTrack).filter("SELECT AVG(ST_Y(geom)) AS mean_latitude FROM your_table_name;").all()
-    df_mean = pd.read_sql(query, engine.connect())
-    print(df_mean)
-
-
-def alchemy_test_relationship():
-    engine = create_engine(
-        f'postgresql://{os.environ["AIVEN_USERNAME"]}:{os.environ["AIVEN_PASSWORD"]}@{os.environ["AIVEN_HOST"]}:{os.environ["AIVEN_PORT"]}/{os.environ["AIVEN_DBNAME"]}?sslmode=require',
-        echo=True,
-        plugins=["geoalchemy2"]
-    )
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    from app.models.domain import User, Collection
-    user = session.query(User).filter_by(
-        name="Jean-Pierre Rio").first()
-    print(user)
-
-
-def geopandas_search_test():
-    engine = get_engine()
-
-    # Filter by bounding box using SQL
-    sql = """
-    SELECT *
-    FROM gpx_tracks
-    WHERE ST_X(ST_StartPoint(geom)) BETWEEN 76.06109619140626 AND 79.14550781250001 
-    AND ST_Y(ST_StartPoint(geom)) BETWEEN 41.48800607185427 AND 42.71069600569497
-    """
-    sql2 = """
-    SELECT *
-    FROM gpx_tracks
-    WHERE ST_X(ST_StartPoint(geom)) BETWEEN 77.96447753906251 AND 78.70742797851564 
-    AND ST_Y(ST_StartPoint(geom)) BETWEEN 41.95029860413911 AND 42.56016134191609
-    """
-
-    gdf_tracks = gpd.read_postgis(sql2, engine, geom_col='geom')
-    gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
-        '%Y-%m-%d %H:%M:%S')
-    gdf_tracks['duration'] = 0
-    try:
-        gdf_tracks['duration'] = (
-            gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
-        gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+        gdf_tracks = gpd.read_postgis(sql2, engine, geom_col='geom')
+        gdf_tracks['insert_date'] = gdf_tracks['insert_date'].dt.strftime(
             '%Y-%m-%d %H:%M:%S')
-        gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
-            '%Y-%m-%d %H:%M:%S')
-    except Exception as e:
-        print(f"Error formatting start_time or end_time: {e}")
+        gdf_tracks['duration'] = 0
+        try:
+            gdf_tracks['duration'] = (
+                gdf_tracks['end_time'] - gdf_tracks['start_time']).dt.total_seconds()
+            gdf_tracks['start_time'] = gdf_tracks['start_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+            gdf_tracks['end_time'] = gdf_tracks['end_time'].dt.strftime(
+                '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            print(f"Error formatting start_time or end_time: {e}")
 
-    print(gdf_tracks.to_json())
+        print(gdf_tracks.to_json())
 
+    def pandas_get_collection(self):
+        engine = get_engine()
+        collection_id = 15
+        sql = f"""
+            SELECT t.* FROM gpx_tracks t JOIN collection_track ct ON ct.track_id = t.id WHERE ct.collection_id = {collection_id}
+        """
 
-def pandas_get_collection():
-    engine = get_engine()
-    collection_id = 15
-    sql = f"""
-        SELECT t.* FROM gpx_tracks t JOIN collection_track ct ON ct.track_id = t.id WHERE ct.collection_id = {collection_id}
-    """
+        gdf = gpd.read_postgis(
+            sql, con=engine, geom_col='geom')
+        print(gdf.head())
+        # gdf.to_file("gpx_tracks.geojson", driver='GeoJSON')
+        print(gdf.shape)
 
-    gdf = gpd.read_postgis(
-        sql, con=engine, geom_col='geom')
-    print(gdf.head())
-    # gdf.to_file("gpx_tracks.geojson", driver='GeoJSON')
-    print(gdf.shape)
-
+    def save_gpx_test():
+        from gpx import read_gpx
+        # gpx_file = open('tests/gpx/Boucle Red Rocks.gpx', 'r')
+        gpx_data = read_gpx("tests/gpx/Boucle Red Rocks.gpx")
+        print(gpx_data.to_wkt())
 
 # pandas_read_postgis_to_geojson()
 # test_postgis_to_geojson()
@@ -267,4 +267,4 @@ def pandas_get_collection():
 # alchemy_test_mean_location()
 # alchemy_test_relationship()
 # geopandas_search_test()
-pandas_get_collection()
+# pandas_get_collection()
