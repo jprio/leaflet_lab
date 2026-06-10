@@ -358,6 +358,10 @@ def update_track(track_id):
         track.name = data['name']
     if 'comment' in data:
         track.comment = data['comment']
+    if 'type' in data:
+        track.type = data['type']
+    if 'link' in data:
+        track.link = data['link']
 
     db.session.commit()
     return jsonify({'message': 'Track updated successfully'}), 200

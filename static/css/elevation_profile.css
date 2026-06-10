@@ -1,0 +1,90 @@
+        .elevation-profile-control {
+            width: 100%;
+            min-width: 320px;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .elevation-profile-control .maptiler-elevation-profile__container,
+        .elevation-profile-control .maptiler-elevation-profile__chart {
+            height: 220px !important;
+            min-height: 220px !important;
+        }
+
+        /* Komoot-style elevation profile */
+        #elevation-profile {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: white !important;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+            border: none !important;
+        }
+
+        #elevation-profile-title {
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            color: #333 !important;
+            margin-bottom: 8px !important;
+        }
+
+        #elevation-profile-canvas {
+            width: 100% !important;
+            height: 220px !important;
+            cursor: crosshair;
+        }
+
+        #elevation-profile-info {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: #666;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+
+        #elevation-profile-info>div {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #elevation-profile-info-hover {
+            display: none;
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 1001;
+        }
+
+        #elevation-profile-canvas:hover~#elevation-profile-info-hover {
+            display: block;
+        }
+
+        .elevation-stat-label {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #999;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .elevation-stat-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .elevation-stat-gain {
+            color: #4CAF50;
+        }
+
+        .elevation-stat-loss {
+            color: #FF6B6B;
+        }

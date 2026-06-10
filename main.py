@@ -91,8 +91,7 @@ def unauthorized():
 
 @app.route("/")
 def index():
-    # return redirect("/alltrail")
-    return render_template("maplibre.html")
+    return redirect("/explore")
 
 
 def allowed_file(filename):
@@ -102,12 +101,13 @@ def allowed_file(filename):
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    print("uploading file...")
     owner = session['user']['sub']
     engine = persistence.get_engine()
     # check if the post request has the file part
     if 'file' not in request.files:
-        flash('No file part')
-        return redirect(request.url)
+        # flash('No file part')
+        return jsonify({'message': 'File uploaded unsuccessfully : no file part'})
     file = request.files['file']
     comment = request.form.get('comment')
     type = request.form.get('activity_type')
@@ -121,7 +121,6 @@ def upload_file():
         filename = secure_filename(file.filename)
         Session = sessionmaker(bind=engine)
         sess = Session()
-        gpx.way
         gpx = gpxpy.parse(file)
         for track in gpx.tracks:
             print(track.name)
@@ -185,8 +184,9 @@ def upload_file():
 
         for route in gpx.routes:
             print('Route:')
-
-        return redirect("/explore/map")
+        print("upload ok")
+        # return redirect("/maplibre")
+        return jsonify({'bounds': [[gpx.get_bounds().min_longitude, gpx.get_bounds().min_latitude], [gpx.get_bounds().max_longitude, gpx.get_bounds().max_latitude]], 'message': 'File uploaded successfully !'})
 
 
 @app.route('/search_places', methods=['GET'])
@@ -230,9 +230,25 @@ def mapbox():
     return render_template('mapbox.html')
 
 
-@app.route('/maplibre')
+@app.route('/explore')
 def maplibre():
     return render_template('maplibre.html')
+
+
+@app.route('/track/<int:track_id>')
+def track_detail(track_id):
+    # Render a detail page for a track. JS will fetch track data and waypoints.
+    current_user_sub = None
+    if 'user' in session:
+        current_user_sub = session['user'].get('sub')
+
+    # Try to fetch minimal ownership info to show edit form when appropriate
+    track = db.session.query(GPXTrack).filter_by(id=track_id).first()
+    is_owner = False
+    if track and current_user_sub and track.owner == current_user_sub:
+        is_owner = True
+
+    return render_template('detail.html', track_id=track_id, is_owner=is_owner)
 
 
 @app.route('/cesiumjs')
