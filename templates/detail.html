@@ -57,7 +57,7 @@
 
     // disable map rotation using touch rotation gesture
     map.touchZoomRotate.disableRotation();
-    map.dragPan.disable();   
+    //map.dragPan.disable();   
     map.on('load', () => {
         map.addSource('track', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id:'track-line', type:'line', source:'track', paint: { 'line-color':'#4caf50', 'line-width':4 } });
