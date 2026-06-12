@@ -49,5 +49,7 @@ Run :
 - genrate availability report with lighthouse and webpagetest
 - monitor with google cloud monitoring and error reporting
 
-Used APIs :
+Used APIs & tools :
 - google maps api for geocoding and places search
+- visualcrossing and open-meteo for weather forecast
+- maplibre for map visualization

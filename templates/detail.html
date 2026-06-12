@@ -1,11 +1,16 @@
 <br>{% extends "base.html" %}
 {% block content %}
-
-    <a href="javascript:history.back()">Lien retour</a>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.13.0/d3.min.js"></script>
+<link rel="stylesheet" href="https://www.visualcrossing.com/widgets/forecast/weather-forecast-widget-d3.css">
+</style>
         <div id="map-and-sidebar">
-        <aside id="track-sidebar">
+            <aside id="track-sidebar">
+            <a href="javascript:history.back()">Lien retour</a>
             <h2 id="track-name">Chargement…</h2>
             <div id="track-meta"></div>
+            <h3>Météo</h3>
+            <div id="weather-info">Chargement météo…</div>
             <h3>Profil d'élévation</h3>
             <div id="elevation-profile"></div>
 
@@ -40,10 +45,19 @@
     const map = new maplibregl.Map({
         container: 'map',
         style: 'https://demotiles.maplibre.org/style.json',
-        center: [11.39085,47.27574],
+        //center: [11.39085,47.27574],
         zoom: 12
     });
+    //map.scrollZoom.disable();
+    // disable map rotation using right click + drag
+    map.dragRotate.disable();
 
+    // disable map rotation using keyboard
+    map.keyboard.disable();
+
+    // disable map rotation using touch rotation gesture
+    map.touchZoomRotate.disableRotation();
+    map.dragPan.disable();   
     map.on('load', () => {
         map.addSource('track', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id:'track-line', type:'line', source:'track', paint: { 'line-color':'#4caf50', 'line-width':4 } });
@@ -65,8 +79,9 @@
                     // fit bounds
                     const coords = geo.features[0].geometry.coordinates;
                     const bounds = coords.reduce((b,c)=> b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+                    console.log("bounds : ", bounds);
                     map.fitBounds(bounds, { padding:40 });
-
+                    console.log("Bounds ", bounds);
                     const props = geo.features[0].properties || {};
                     document.getElementById('track-name').textContent = props.name || 'Sans nom';
                     document.getElementById('track-meta').innerHTML = '<p>Type: '+(props.type||'')+'<br>Length: '+(props.length||'')+'<br>Elevation gain: '+(props.elevation_gain||'')+'</p>';
@@ -79,10 +94,37 @@
                     document.getElementById('edit-comment').value = props.comment || '';
                     {% endif %}
 
+                    // fetch and show weather at track midpoint
+                    try {
+                        const mid = coords[Math.floor(coords.length/2)];
+                        if (mid && mid.length >= 2) {
+                            fetchWeatherAt(mid[1], mid[0]);
+                        }
+                    } catch(e) { console.warn('Weather fetch error', e); }
+
                     // show elevation profile if function available
                     if (typeof showElevationProfile === 'function') {
                         try { showElevationProfile(geo.features[0]); } catch(e) { console.warn(e); }
                     }
+                    map.once('moveend', () => {
+                    map.setMaxBounds(map.getBounds());
+                    });
+                    console.log('Initializing weather widget with location', map.getBounds()._ne.lat, map.getBounds()._ne.lng);
+                    window.weatherWidgetConfig = window.weatherWidgetConfig || [];
+                    window.weatherWidgetConfig.push({
+                        selector: ".weatherForecastWidget",
+                        apiKey: "SVHYSZMLGR2ZUFJW4ZZGEXNT5",
+                        location: bounds._ne.lat + "," + bounds._ne.lng,
+                    //    location: "41.92,76.829",
+                        unitGroup: "metric"
+                    });
+                    (function() {
+                        var d = document, s = d.createElement('script');
+                        s.src = 'https://www.visualcrossing.com/widgets/forecast/weather-forecast-widget-d3.js';
+                        s.setAttribute("data-timestamp", +new Date());
+                        (d.head || d.body).appendChild(s);
+                    })();
+
                 }
             }).catch(err => {
                 console.error('Failed to load track', err);
@@ -95,6 +137,35 @@
                 const fc = { type:'FeatureCollection', features };
                 if (map.getSource('waypoints')) map.getSource('waypoints').setData(fc);
             }).catch(e => console.warn('Unable to load waypoints', e));
+    }
+
+    function fetchWeatherAt(lat, lon){
+        const el = document.getElementById('weather-info');
+        if (!el) return;
+        el.textContent = 'Chargement météo…';
+        //const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=precipitation&current_weather=true&timezone=auto`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&current_weather=true&dailycurrent=temperature_2m,wind_speed_10m&hourly=weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation&forecast_days=1`;
+        fetch(url)
+            .then(r => r.ok ? r.json() : Promise.reject(r))
+            .then(w => {
+                const temp = w.current_weather && typeof w.current_weather.temperature !== 'undefined' ? w.current_weather.temperature : null;
+                let precip = null;
+                console.log('Weather data', w);
+                if (w.hourly && Array.isArray(w.hourly.time) && Array.isArray(w.hourly.precipitation)){
+                    const times = w.hourly.time;
+                    const precs = w.hourly.precipitation;
+                    const now = new Date();
+                    // build ISO hour string like 2023-06-30T14:00
+                    const isoHour = now.toISOString().slice(0,13)+':00';
+                    let idx = times.indexOf(isoHour);
+                    if (idx === -1) idx = 0;
+                    precip = precs[idx];
+                }
+                el.innerHTML = '<p>Température: ' + (temp!==null ? (temp + ' °C') : 'N/A') + '<br>Précipitation (heure): ' + (precip!==null ? (precip + ' mm') : 'N/A') + '</p>';
+            }).catch(e => {
+                console.warn('Unable to fetch weather', e);
+                el.textContent = 'Météo indisponible';
+            });
     }
 
     {% if is_owner %}
@@ -114,5 +185,8 @@
     {% endif %}
 
 </script>
+<div class="weatherForecastWidget" style="background-color: #ffffff99;height: 175px;"></div>
+
+
 <script src="{{ url_for('static', filename='js/elevation-profile.js') }}"></script>
 {% endblock %}
