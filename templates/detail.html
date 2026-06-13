@@ -151,7 +151,7 @@
                     console.log("Bounds ", bounds);
                     const props = geo.features[0].properties || {};
                     document.getElementById('track-name').textContent = props.name || 'Sans nom';
-                    document.getElementById('track-meta').innerHTML = '<p>Type: '+(props.type||'')+'<br>Length: '+(Math.round(props.length/1000).toFixed(1)||'')+'km<br>Elevation gain: '+(props.elevation_gain||'')+'m</p>';
+                    document.getElementById('track-meta').innerHTML = '<p>Type: '+(props.type||'')+'<br>Length: '+(Math.round(props.length/1000).toFixed(1)||'')+'km<br>Elevation gain: '+(Math.round(props.elevation_gain).toFixed(0)||'')+'m</p>';
 
                     {% if is_owner %}
                     // prefill edit form
