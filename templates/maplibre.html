@@ -293,9 +293,34 @@
                 const item = document.createElement('div');
                 item.className = 'track-item';
 
+                const header = document.createElement('div');
+                header.className = 'track-item-header';
+
                 const title = document.createElement('h4');
                 title.textContent = props.name || 'Sans nom';
-                item.appendChild(title);
+                header.appendChild(title);
+
+                const trackId = feature.id || props.id;
+                if (props.is_owner && trackId) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'track-delete-btn';
+                    deleteBtn.textContent = '🗑️';
+                    deleteBtn.title = 'Supprimer cette trace';
+                    deleteBtn.style.marginLeft = 'auto';
+                    deleteBtn.style.background = 'transparent';
+                    deleteBtn.style.border = 'none';
+                    deleteBtn.style.cursor = 'pointer';
+                    deleteBtn.style.fontSize = '1.1rem';
+                    deleteBtn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        if (!confirm('Supprimer cette trace ?')) return;
+                        deleteTrack(trackId);
+                    });
+                    header.appendChild(deleteBtn);
+                }
+
+                item.appendChild(header);
 
                 const rows = [
                     { icon: '📏', label: props.length ? `${(props.length / 1000).toFixed(1)} km` : 'N/A' },
@@ -329,6 +354,21 @@
 
                 list.appendChild(item);
             });
+        }
+
+        function deleteTrack(trackId) {
+            fetch('/api/tracks/' + trackId, { method: 'DELETE' })
+                .then((response) => {
+                    if (response.ok) return response.json();
+                    return response.json().then((json) => Promise.reject(json));
+                })
+                .then(() => {
+                    redraw();
+                })
+                .catch((error) => {
+                    console.error('Unable to delete track:', error);
+                    alert('Impossible de supprimer la trace : ' + (error.error || error.message || 'Erreur serveur'));
+                });
         }
 
         function loadCollectionOptions() {

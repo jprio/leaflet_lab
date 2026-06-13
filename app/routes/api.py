@@ -53,7 +53,11 @@ def find_tracks():
             print(f"Error formatting start_time or end_time: {e}")
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
-        gdf_tracks['comment'].str.replace('\\r\\n', '<br>')
+        gdf_tracks['comment'].str.replace('\r\n', '<br>')
+        current_user_uuid = session.get('user', {}).get(
+            'sub') if 'user' in session else None
+        gdf_tracks['is_owner'] = gdf_tracks['owner'].fillna(
+            '').eq(current_user_uuid)
         print(gdf_tracks)
         return gdf_tracks.to_json()
 
@@ -221,8 +225,11 @@ def get_collection_tracks(collection_id):
         gdf_tracks['type'] = gdf_tracks['type'].fillna('other')
         gdf_tracks['link'] = gdf_tracks['link'].fillna('')
         gdf_tracks['comment'] = gdf_tracks['comment'].str.replace(
-            '\\r\\n', '<br>', regex=False)
-
+            '\r\n', '<br>', regex=False)
+        current_user_uuid = session.get('user', {}).get(
+            'sub') if 'user' in session else None
+        gdf_tracks['is_owner'] = gdf_tracks['owner'].fillna(
+            '').eq(current_user_uuid)
         user_session.commit()
         user_session.close()
         return gdf_tracks.to_json(), 200
