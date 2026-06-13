@@ -610,10 +610,10 @@
             console.log("Clicked feature properties:", props);
             const description = '<strong>' + props.name + '</strong>'
                 + '<p>'
-                + 'Length : ' + props.length + ' <br>'
+                + 'Length : ' + Math.round(props.length/1000).toFixed(1) + ' km<br>'
                 + 'Type : ' + props.type + ' <br>'
-                + 'Elevation gain : ' + props.elevation_gain + ' <br>'
-                + 'Elevation loss : ' + props.elevation_loss + ' <br>'
+                + 'Elevation gain : ' + Math.round(props.elevation_gain).toFixed(0) + ' m<br>'
+                + 'Elevation loss : ' + Math.round(props.elevation_loss).toFixed(0) + ' m<br>'
                 + 'Comment : ' + props.comment + '<br>'
                 + (props.link ? ('<a href="' + props.link + '" target="_blank">View Link</a><br>') : '')
                 + '<a href="/track/' + props.id + '">Voir détail</a><br>'
@@ -748,8 +748,7 @@
             
             // Check if we clicked on a feature
             const features = map.queryRenderedFeatures({ layers: ['waypoints', 'trails'] });
-            if (features.length > 0) return;
-            
+            //if (features.length > 0) return;
             creatingWaypointCoords = e.lngLat;
             creatingWaypoint = true;
             document.getElementById('waypoint-modal').showModal();
