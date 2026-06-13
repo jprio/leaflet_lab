@@ -33,6 +33,9 @@ def find_tracks():
         AND ST_Y(ST_StartPoint(geom)) BETWEEN {SE_lat} AND {NW_lat}
         """
         gdf_tracks = gpd.GeoDataFrame.from_postgis(sql, con=conn)
+        print(10*"=")
+        print(gdf_tracks)
+        print(10*"=")
         if gdf_tracks.empty:
             return gdf_tracks.to_json()
 

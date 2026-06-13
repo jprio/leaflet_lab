@@ -3,6 +3,8 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.13.0/d3.min.js"></script>
 <link rel="stylesheet" href="https://www.visualcrossing.com/widgets/forecast/weather-forecast-widget-d3.css">
+<script src="https://unpkg.com/maplibre-basemaps@0.0.6/dist/maplibre-basemaps.js"></script>
+<script src="/js/baseMapControl.js"></script>
 </style>
         <div id="map-and-sidebar">
             <aside id="track-sidebar">
@@ -41,30 +43,95 @@
     </div>
 <script>
     const trackId = {{ track_id }};
+    const search_control = new maplibreSearchBox.MapLibreSearchControl({
+        useMapFocusPoint: true,
+        onResultSelected: feature => {
+            // console.log(feature.geometry.coordinates);
+        }
+    });
 
     const map = new maplibregl.Map({
         container: 'map',
         style: 'https://demotiles.maplibre.org/style.json',
         //center: [11.39085,47.27574],
-        zoom: 12
+        zoom: 12,
+                    style: {
+                version: 8,
+                layers: [
+                    {
+                        id: 'hills',
+                        type: 'hillshade',
+                        tiles: [demSource.sharedDemProtocolUrl],
+                        source: 'hillshadeSource',
+                        layout: { visibility: 'visible' },
+                        paint: { 'hillshade-shadow-color': '#473B24' }
+                    },
+                ],
+                sources: {
+                    // Use a different source for terrain and hillshade layers, to improve render quality
+                    terrainSource: {
+                        type: 'raster-dem',
+                        url: 'https://tiles.mapterhorn.com/tilejson.json'
+                    },
+                    hillshadeSource: {
+                        type: 'raster-dem',
+                        url: 'https://tiles.mapterhorn.com/tilejson.json'
+                    },
+                    contourSourceFeet: {
+                        type: 'vector',
+                        tiles: [
+                            demSource.contourProtocolUrl({
+                                // meters to feet
+                                multiplier: 3.28084,
+                                overzoom: 1,
+                                thresholds: {
+                                    // zoom: [minor, major]
+                                    11: [200, 1000],
+                                    12: [100, 500],
+                                    13: [100, 500],
+                                    14: [50, 200],
+                                    15: [20, 100]
+                                },
+                                elevationKey: 'ele',
+                                levelKey: 'level',
+                                contourLayer: 'contours'
+                            })
+                        ],
+                        maxzoom: 15
+                    }
+                },
+                terrain: {
+                    source: 'terrainSource',
+                    exaggeration: 1
+                },
+                sky: {}
+            },
+
     });
-    //map.scrollZoom.disable();
-    // disable map rotation using right click + drag
-    map.dragRotate.disable();
-
-    // disable map rotation using keyboard
-    map.keyboard.disable();
-
-    // disable map rotation using touch rotation gesture
-    map.touchZoomRotate.disableRotation();
-    //map.dragPan.disable();   
     map.on('load', () => {
+        
+        map.addControl(search_control, "top-right");
+        map.addControl(basemapControl, 'top-right');
+        
+        map.addControl(
+            new maplibregl.NavigationControl({
+                visualizePitch: true,
+                showZoom: true,
+                showCompass: true
+        })
+        );
+        
+        map.addControl(
+            new maplibregl.TerrainControl({
+                source: 'terrainSource',
+                exaggeration: 1
+        })
+        );
         map.addSource('track', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id:'track-line', type:'line', source:'track', paint: { 'line-color':'#4caf50', 'line-width':4 } });
 
         map.addSource('waypoints', { type:'geojson', data: { type:'FeatureCollection', features: [] } });
         map.addLayer({ id:'waypoints', type:'circle', source:'waypoints', paint: { 'circle-radius':6, 'circle-color':'#ff8c00', 'circle-stroke-color':'#fff', 'circle-stroke-width':2 } });
-
         loadData();
     });
 
@@ -92,6 +159,7 @@
                     document.getElementById('edit-type').value = props.type || '';
                     document.getElementById('edit-link').value = props.link || '';
                     document.getElementById('edit-comment').value = props.comment || '';
+                    document.title = props.name || 'Track ' + trackId;
                     {% endif %}
 
                     // fetch and show weather at track midpoint

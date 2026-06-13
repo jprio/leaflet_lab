@@ -11,6 +11,19 @@
         </aside>
         <div id="map"></div>
     </div>
+        <!-- Waypoint Creation Modal -->
+    <dialog id="waypoint-modal" style="padding: 20px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px;">
+        <h3>Créer un waypoint</h3>
+        <form id="waypoint-form">
+            <label for="waypoint-description" style="display: block; margin: 10px 0 5px 0;">Description:</label>
+            <input type="text" id="waypoint-description" placeholder="Entrez la description du waypoint" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;" required />
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button type="submit" style="flex: 1; padding: 10px; background: #1a9f48; color: white; border: none; border-radius: 4px; cursor: pointer;">Créer</button>
+                <button type="button" onclick="document.getElementById('waypoint-modal').close();" style="flex: 1; padding: 10px; background: #ccc; color: black; border: none; border-radius: 4px; cursor: pointer;">Annuler</button>
+            </div>
+        </form>
+    </dialog>
+
     <button id="open-track-filters-button" class="hidden" type="button">Filtres</button>
     <div id="track-filters">
         <div class="filter-header">
@@ -55,6 +68,7 @@
             // offload contour line computation to a web worker
             worker: true
         });
+        
         const demSource = new mlcontour.DemSource({
             url: "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
             encoding: "terrarium",
@@ -345,7 +359,8 @@
                             properties: {
                                 id: wp.id,
                                 description: wp.description || 'Waypoint',
-                                created_at: wp.created_at || null
+                                created_at: wp.created_at || null,
+                                canEdit: true
                             },
                             geometry: {
                                 type: 'Point',
@@ -683,7 +698,157 @@
                 });
         };
 
+        // Waypoint creation on map click
+        let creatingWaypoint = false;
+        let creatingWaypointCoords = null;
+
+        map.on('click', (e) => {
+            // Only create waypoint if not clicking on existing waypoints or tracks
+            if (creatingWaypoint || e.defaultPrevented) return;
+            
+            // Check if we clicked on a feature
+            const features = map.queryRenderedFeatures({ layers: ['waypoints', 'trails'] });
+            if (features.length > 0) return;
+            
+            creatingWaypointCoords = e.lngLat;
+            creatingWaypoint = true;
+            document.getElementById('waypoint-modal').showModal();
+            document.getElementById('waypoint-description').focus();
+        });
+
+        // Waypoint modal handlers
+        document.getElementById('waypoint-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const description = document.getElementById('waypoint-description').value.trim();
+            
+            if (!creatingWaypointCoords) return;
+            
+            try {
+                const response = await fetch('/api/waypoints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lat: creatingWaypointCoords.lat,
+                        lng: creatingWaypointCoords.lng,
+                        description: description
+                    })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('waypoint-modal').close();
+                    document.getElementById('waypoint-form').reset();
+                    creatingWaypoint = false;
+                    creatingWaypointCoords = null;
+                    loadWaypoints();
+                } else {
+                    alert('Erreur lors de la création du waypoint');
+                }
+            } catch (err) {
+                console.error('Error creating waypoint:', err);
+                alert('Erreur: ' + err.message);
+            }
+        });
+
+        document.getElementById('waypoint-modal').addEventListener('cancel', () => {
+            creatingWaypoint = false;
+            creatingWaypointCoords = null;
+        });
+
+        // Enhanced waypoint click handler with edit/delete buttons
+        map.off('click', 'waypoints');
+        map.on('click', 'waypoints', (e) => {
+            const props = e.features[0].properties || {};
+            const waypointId = props.id;
+            const description = props.description || 'Waypoint';
+            const createdAt = props.created_at || null;
+            
+            let actionButtons = '';
+            if (props.canEdit) {
+                actionButtons = `
+                    <div style="margin-top: 10px; display: flex; gap: 5px;">
+                        <button class="wp-edit-btn" data-id="${waypointId}" data-description="${description.replace(/"/g, '&quot;')}" style="flex: 1; padding: 5px; cursor: pointer; background: #4caf50; color: white; border: none; border-radius: 4px;">✏️ Éditer</button>
+                        <button class="wp-delete-btn" data-id="${waypointId}" style="flex: 1; padding: 5px; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 4px;">🗑️ Supprimer</button>
+                    </div>
+                `;
+            }
+            
+            const popupHTML = '<div style="min-width: 200px;"><strong>' + description + '</strong>' +
+                '<p>' +
+                (createdAt ? 'Créé le: ' + createdAt + '<br>' : '') +
+                '</p>' +
+                actionButtons + '</div>';
+
+            const popup = new maplibregl.Popup()
+                .setLngLat(e.lngLat)
+                .setHTML(popupHTML)
+                .addTo(map);
+            
+            // Add event listeners to buttons after popup is rendered
+            setTimeout(() => {
+                const editBtn = document.querySelector('.wp-edit-btn');
+                const deleteBtn = document.querySelector('.wp-delete-btn');
+                
+                if (editBtn) {
+                    editBtn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        const id = editBtn.dataset.id;
+                        const desc = editBtn.dataset.description;
+                        editWaypoint(id, desc);
+                    });
+                }
+                
+                if (deleteBtn) {
+                    deleteBtn.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        const id = deleteBtn.dataset.id;
+                        deleteWaypoint(id);
+                    });
+                }
+            }, 0);
+        });
+
+        // Edit waypoint
+        window.editWaypoint = function(waypointId, currentDescription) {
+            const newDescription = prompt('Éditer la description:', currentDescription);
+            if (newDescription !== null) {
+                fetch('/api/waypoints/' + waypointId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description: newDescription })
+                })
+                .then(r => r.ok ? r.json() : Promise.reject(r))
+                .then(() => {
+                    loadWaypoints();
+                    // Close any open popups
+                    document.querySelectorAll('.maplibregl-popup').forEach(p => p.remove());
+                })
+                .catch(err => {
+                    console.error('Error updating waypoint:', err);
+                    alert('Erreur lors de la mise à jour du waypoint');
+                });
+            }
+        };
+
+        // Delete waypoint
+        window.deleteWaypoint = function(waypointId) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer ce waypoint ?')) {
+                fetch('/api/waypoints/' + waypointId, { method: 'DELETE' })
+                    .then(r => r.ok ? r.json() : Promise.reject(r))
+                    .then(() => {
+                        loadWaypoints();
+                        // Close any open popups
+                        document.querySelectorAll('.maplibregl-popup').forEach(p => p.remove());
+                    })
+                    .catch(err => {
+                        console.error('Error deleting waypoint:', err);
+                        alert('Erreur lors de la suppression du waypoint');
+                    });
+            }
+        };
+
     </script>
+
+
     <script src="{{ url_for('static', filename='js/elevation-profile.js') }}"></script>
 
 {% endblock %}
