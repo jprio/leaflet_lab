@@ -122,6 +122,40 @@
             attribution: '&copy; Google Maps'
         }
 
+        const color_relief = {
+            name: 'Color Relief',
+            type: 'color-relief',
+            source: 'terrainSource', // Source raster-dem
+            paint: {
+                'color-relief-color': [
+                    'interpolate', ['linear'], ['elevation'],
+                    0,
+    "black",
+    8849,
+    /*
+                        400, 'rgb(4, 0, 108)',
+                        582.35, 'rgb(5, 1, 154)',
+                        764.71, 'rgb(10, 21, 189)',
+                        947.06, 'rgb(16, 44, 218)',
+                        1129.41, 'rgb(24, 69, 240)',
+                        1311.76, 'rgb(20, 112, 193)',
+                        1494.12, 'rgb(39, 144, 116)',
+                        1676.47, 'rgb(57, 169, 29)',
+                        1858.82, 'rgb(111, 186, 5)',
+                        2041.18, 'rgb(160, 201, 4)',
+                        2223.53, 'rgb(205, 216, 2)',
+                        2405.88, 'rgb(244, 221, 4)',
+                        2588.24, 'rgb(251, 194, 14)',
+                        2770.59, 'rgb(252, 163, 21)',
+                        2952.94, 'rgb(253, 128, 20)',
+                        3135.29, 'rgb(254, 85, 14)',
+                        3317.65, 'rgb(243, 36, 13)',
+                        3500, 'rgb(215, 5, 13)'     
+                        */
+                ]       
+            }
+        }
+  
         const baseLayers = {
             osm2,
             osmHot,
@@ -129,7 +163,8 @@
             arcgisHybrid,
             google_terrain,
             google_road,
-            google_sat
+            google_sat,
+            color_relief
         }   
         const basemapControl = new BasemapControl({ basemaps: baseLayers, initialBasemap: "google_terrain", width: "200px" });
 
@@ -454,14 +489,59 @@
                         tiles: [demSource.sharedDemProtocolUrl],
                         source: 'hillshadeSource',
                         layout: { visibility: 'visible' },
-                        paint: { 'hillshade-shadow-color': '#473B24' }
+                        paint: { 'hillshade-shadow-color': '#99742e' }
                     },
+                    {
+                id: 'color-relief',
+                type: 'color-relief',
+                source: 'terrainSource',
+                //opacity: 0.5,
+                paint: {
+                    'color-relief-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['elevation'],
+                        0, 'rgb(232, 231, 242)',
+                        200, 'rgb(10, 21, 189)',
+                        400, 'rgb(16, 44, 218)',
+                        800, 'rgb(24, 69, 240)',
+                        1000, 'rgb(20, 112, 193)',
+                        1500, 'rgb(39, 144, 116)',
+                        2000, 'rgb(57, 169, 29)',
+                        2500, 'rgb(111, 186, 5)',
+                        3000, 'rgb(160, 201, 4)',
+                        3500, 'rgb(205, 216, 2)',
+                        4000, 'rgb(244, 221, 4)',
+                        4500, 'rgb(251, 194, 14)',
+                        5000, 'rgb(252, 163, 21)',
+                        5500, 'rgb(253, 128, 20)',
+                        6000, 'rgb(254, 85, 14)',
+                        7000, 'rgb(243, 36, 13)',
+                        8500, 'rgb(215, 5, 13)'                    ]
+                }
+            }
                 ],
                 sources: {
                     // Use a different source for terrain and hillshade layers, to improve render quality
+                    terrainSourceAws: {
+                        type: 'raster',
+                        //url: 'https://tiles.mapterhorn.com/tilejson.json'
+                        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+                        
+                        //url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+                        encoding: 'terrarium',
+                        tileSize: 256
+
+                    },
                     terrainSource: {
                         type: 'raster-dem',
                         url: 'https://tiles.mapterhorn.com/tilejson.json'
+                        //tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+                        
+                        //url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+                        //encoding: 'terrarium',
+                        //tileSize: 256
+
                     },
                     hillshadeSource: {
                         type: 'raster-dem',
@@ -559,7 +639,6 @@
                     'line-opacity': 0.9
                 }
             });
-
             map.addLayer({
                 'id': 'waypoints',
                 'type': 'circle',

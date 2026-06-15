@@ -108,6 +108,76 @@
             },
 
     });
+    const waypointTooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
+
+    map.off('click', 'waypoints');
+
+    map.on('click', 'waypoints', (e) => {
+    const props = e.features[0].properties || {};
+    const waypointId = props.id;
+    const description = props.description || 'Waypoint';
+    const createdAt = props.created_at || null;
+    
+    let actionButtons = '';
+    if (props.canEdit) {
+        actionButtons = `
+            <div style="margin-top: 10px; display: flex; gap: 5px;">
+                <button class="wp-edit-btn" data-id="${waypointId}" data-description="${description.replace(/"/g, '&quot;')}" style="flex: 1; padding: 5px; cursor: pointer; background: #4caf50; color: white; border: none; border-radius: 4px;">✏️ Éditer</button>
+                <button class="wp-delete-btn" data-id="${waypointId}" style="flex: 1; padding: 5px; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 4px;">🗑️ Supprimer</button>
+            </div>
+        `;
+    }
+    
+    const popupHTML = '<div style="min-width: 200px;"><strong>' + description + '</strong>' +
+        '<p>' +
+        (createdAt ? 'Créé le: ' + createdAt + '<br>' : '') +
+        '</p>' +
+        actionButtons + '</div>';
+
+    const popup = new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(popupHTML)
+        .addTo(map);
+    
+    // Add event listeners to buttons after popup is rendered
+    setTimeout(() => {
+        const editBtn = document.querySelector('.wp-edit-btn');
+        const deleteBtn = document.querySelector('.wp-delete-btn');
+        
+        if (editBtn) {
+            editBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const id = editBtn.dataset.id;
+                const desc = editBtn.dataset.description;
+                editWaypoint(id, desc);
+            });
+        }
+        
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const id = deleteBtn.dataset.id;
+                deleteWaypoint(id);
+            });
+        }
+        }, 0);
+    });
+
+    map.on('mouseenter', 'waypoints', (e) => {
+        map.getCanvas().style.cursor = 'pointer';
+        const props = e.features[0].properties || {};
+        waypointTooltip
+            .setLngLat(e.lngLat)
+            .setHTML('<strong>' + (props.description || 'Waypoint') + '</strong>')
+            .addTo(map);
+    });
+
+    map.on('mouseleave', 'waypoints', () => {
+        map.getCanvas().style.cursor = '';
+        waypointTooltip.remove();
+    });
+
+
     map.on('load', () => {
         
         map.addControl(search_control, "top-right");
