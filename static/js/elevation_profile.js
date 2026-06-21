@@ -130,12 +130,20 @@ async function getElevationAt(lon, lat, z = 10, map) {
 	return elevation !== undefined ? elevation : null;
 
 }
+const hover_marker = new maplibregl.Marker();
+const start_marker = new maplibregl.Marker({
+	color: "green"
+});
+const end_marker = new maplibregl.Marker({
+	color: "red"
+});
 
 export function renderElevationProfile(
 	container,
 	profile,
 	width,
-	height
+	height,
+	map
 ) {
 	const margin = {
 		top: 10,
@@ -432,7 +440,8 @@ export function renderElevationProfile(
 
 	const tooltip =
 		container.querySelector("#profile-tooltip");
-
+	start_marker.setLngLat({ lng: profile.points[0].lon, lat: profile.points[0].lat }).addTo(map);
+	end_marker.setLngLat({ lng: profile.points[profile.points.length - 1].lon, lat: profile.points[profile.points.length - 1].lat }).addTo(map);
 	let collapsed = false;
 
 	function clamp(value, min, max) {
@@ -508,6 +517,12 @@ export function renderElevationProfile(
 		const point =
 			data[index];
 
+		if (point.lon !== undefined && point.lat !== undefined) {
+			hover_marker
+				.setLngLat([point.lon, point.lat])
+				.addTo(map);
+		}
+
 		const pointSvg =
 			profilePoints[index];
 
@@ -574,7 +589,7 @@ export function renderElevationProfile(
 		cursor.setAttribute("opacity", "0");
 		pointCircle.setAttribute("opacity", "0");
 		tooltip.style.display = "none";
-
+		hover_marker.remove();
 		container.dispatchEvent(
 			new CustomEvent("profile-leave")
 		);

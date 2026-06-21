@@ -676,6 +676,7 @@
                 closeOnClick: false
             });
 
+
         map.on('mouseover', 'trails', (e) => {
             const coordinates = e.features[0].geometry.coordinates.slice();
 
@@ -740,10 +741,13 @@
                     document.getElementById("elevation"),
                     profile,
                     830,
-                    230
-                    );
+                    130, 
+                    map
+                );
             });
-
+            //console.log("geom 0",e.features[0].geometry.coordinates[0][0], e.features[0].geometry.coordinates[0][1]);
+            //start_marker.setLngLat({ lng: e.features[0].geometry.coordinates[0][0], lat: e.features[0].geometry.coordinates[0][1] }).addTo(map);
+            //end_marker.setLngLat({ lng: e.features[0].geometry.coordinates[e.features[0].geometry.coordinates.length-1][0], lat: e.features[0].geometry.coordinates[e.features[0].geometry.coordinates.length-1][1] }).addTo(map);
         });
         const waypointTooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
 
