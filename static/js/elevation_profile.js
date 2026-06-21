@@ -139,9 +139,9 @@ export function renderElevationProfile(
 ) {
 	const margin = {
 		top: 10,
-		right: 20,
-		bottom: 30,
-		left: 50
+		right: 40,
+		bottom: 50,
+		left: 60
 	};
 
 	const chartWidth =
