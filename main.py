@@ -255,6 +255,11 @@ def track_detail(track_id):
 def cesiumjs():
     return render_template('cesiumjs.html')
 
+
+@app.route('/elevation_custom')
+def elevation_custom():
+    return render_template('elevation_custom.html')
+
 # ======================== TRAVEL WISHES ROUTES ========================
 
 

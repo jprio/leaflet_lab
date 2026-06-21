@@ -53,3 +53,13 @@ Used APIs & tools :
 - google maps api for geocoding and places search
 - visualcrossing and open-meteo for weather forecast
 - maplibre for map visualization
+
+Elevation profile : 
+- profil d’élévation SVG ;
+- axes distance / altitude ;
+- surface verte sous la courbe ;
+- ligne verticale au survol ;
+- point rouge sur la courbe ;
+- tooltip avec distance, altitude, D+ cumulé et pente ;
+- événement profile-hover vers MapLibre ;
+- bouton intégré pour afficher / masquer le profil.

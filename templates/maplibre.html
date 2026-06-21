@@ -1,7 +1,6 @@
 <br>{% extends "base.html" %}%
 {% block content %}
 
-
     <div id="map-and-sidebar">
         <aside id="track-sidebar">
             <h2>Traces affichées</h2>
@@ -10,6 +9,8 @@
             </div>
         </aside>
         <div id="map"></div>
+        <div id="elevation" style="width: 800px; height: 220px; visibility: hidden;"></div>
+    </div>
     </div>
         <!-- Waypoint Creation Modal -->
     <dialog id="waypoint-modal" style="padding: 20px; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px;">
@@ -60,7 +61,13 @@
             </div>
         </div>
     </div>
-    <script>
+
+    <script type="module"> 
+        import {
+            ElevationProfile,
+            renderElevationProfile
+        } from "./js/elevation_profile.js";
+
         const demSourceMaptiler = new mlcontour.DemSource({
             url: 'https://api.maptiler.com/tiles/terrain-rgb-v2/{z}/{x}/{y}.webp?key=TJBqVnX8a4CMqkunq4W0',
             encoding: 'mapbox',
@@ -125,7 +132,7 @@
         const color_relief = {
             name: 'Color Relief',
             type: 'color-relief',
-            source: 'terrainSource', // Source raster-dem
+            source: 'terrain', // Source raster-dem
             paint: {
                 'color-relief-color': [
                     'interpolate', ['linear'], ['elevation'],
@@ -494,7 +501,7 @@
                     {
                 id: 'color-relief',
                 type: 'color-relief',
-                source: 'terrainSource',
+                source: 'terrain',
                 //opacity: 0.5,
                 paint: {
                     'color-relief-color': [
@@ -533,7 +540,7 @@
                         tileSize: 256
 
                     },
-                    terrainSource: {
+                    terrain: {
                         type: 'raster-dem',
                         url: 'https://tiles.mapterhorn.com/tilejson.json'
                         //tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
@@ -571,7 +578,7 @@
                     }
                 },
                 terrain: {
-                    source: 'terrainSource',
+                    source: 'terrain',
                     exaggeration: 1
                 },
                 sky: {}
@@ -579,6 +586,8 @@
             maxZoom: 18,
             maxPitch: 85
         });
+    //map.setTerrain({ source: 'terrainSource' });
+
 
         map.addControl(search_control, "top-right");
 
@@ -592,7 +601,7 @@
 
         map.addControl(
             new maplibregl.TerrainControl({
-                source: 'terrainSource',
+                source: 'terrain',
                 exaggeration: 1
             })
         );
@@ -717,7 +726,23 @@
 
             map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 600 });
 
-            showElevationProfile(e.features[0]);
+            const ne = bounds.getNorthEast(); // {lng, lat}
+            console.log("ne",ne)
+            const elevation = map.queryTerrainElevation([ne.lng, ne.lat], { exaggerated: false });
+    
+
+            console.log("Elevation at point:", elevation);
+            document.getElementById("elevation").style.visibility = "visible";
+            ElevationProfile.create(e.features[0].geometry, map).then(profile => {
+                renderElevationProfile(
+                    document.getElementById("elevation"),
+                    profile,
+                    800,
+                    200
+                    );
+            });
+
+            
         });
 
         const waypointTooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
@@ -799,10 +824,10 @@
             const bounds = map.getBounds();
             const ne = bounds.getNorthEast(); // {lng, lat}
             const sw = bounds.getSouthWest(); // {lng, lat}
-            ne_lat = Math.round(ne.lat * 10000) / 10000;
-            ne_lng = Math.round(ne.lng * 10000) / 10000;
-            sw_lat = Math.round(sw.lat * 10000) / 10000;
-            sw_lng = Math.round(sw.lng * 10000) / 10000;
+            const ne_lat = Math.round(ne.lat * 10000) / 10000;
+            const ne_lng = Math.round(ne.lng * 10000) / 10000;
+            const sw_lat = Math.round(sw.lat * 10000) / 10000;
+            const sw_lng = Math.round(sw.lng * 10000) / 10000;
             const collectionId = currentFilterState.collectionId;
             const url = collectionId ? '/api/collection_tracks/' + collectionId : '/api/find_tracks?NW_lon=' + sw_lng + '&SE_lon=' + ne_lng + '&NW_lat=' + ne_lat + '&SE_lat=' + sw_lat;
             fetch(url)
@@ -822,12 +847,19 @@
         let creatingWaypointCoords = null;
 
         map.on('click', (e) => {
+            console.log("creatingWaypoint", creatingWaypoint, "e.defaultPrevented", e.defaultPrevented);
             // Only create waypoint if not clicking on existing waypoints or tracks
             if (creatingWaypoint || e.defaultPrevented) return;
-            
+            const bbox = [
+                [e.point.x - 5, e.point.y - 5],
+                [e.point.x + 5, e.point.y + 5]
+            ];
             // Check if we clicked on a feature
-            const features = map.queryRenderedFeatures({ layers: ['waypoints', 'trails'] });
-            //if (features.length > 0) return;
+            const features = map.queryRenderedFeatures(bbox,{ layers: ['waypoints', 'trails'],  });
+            if (features.length > 0) {
+                console.log("features", features);
+                return;
+            };
             creatingWaypointCoords = e.lngLat;
             creatingWaypoint = true;
             document.getElementById('waypoint-modal').showModal();
@@ -867,7 +899,8 @@
             }
         });
 
-        document.getElementById('waypoint-modal').addEventListener('cancel', () => {
+        document.getElementById('waypoint-modal').addEventListener('close', () => {
+            console.log("canceling waypoint creation");
             creatingWaypoint = false;
             creatingWaypointCoords = null;
         });
@@ -966,7 +999,5 @@
 
     </script>
 
-
-    <script src="{{ url_for('static', filename='js/elevation-profile.js') }}"></script>
 
 {% endblock %}
