@@ -676,7 +676,7 @@
                 closeOnClick: false
             });
 
-        map.on('click', 'trails', (e) => {
+        map.on('mouseover', 'trails', (e) => {
             const coordinates = e.features[0].geometry.coordinates.slice();
 
             // Ensure that if the map is zoomed out such that multiple
@@ -707,10 +707,18 @@
                 + '<a href="/track/' + props.id + '">Voir détail</a><br>'
                 + '</p>';
 
-            new maplibregl.Popup()
+            popup
                 .setLngLat(e.lngLat).setHTML(description)
                 .addTo(map);
             // console.log("Clicked feature:", e.features[0].geometry.coordinates);
+            
+        });
+        map.on('mouseleave', 'trails', (e) => {
+            map.getCanvas().style.cursor = 'pointer';
+            popup.remove();
+        });
+
+        map.on('click', 'trails', (e) => {
             const bounds = new maplibregl.LngLatBounds();
             const coords = e.features[0].geometry?.coordinates || [];
             if (e.features[0].geometry?.type === 'LineString') {
@@ -724,14 +732,8 @@
                 map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 600 });
             }
 
-            map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 600 });
+            map.fitBounds(bounds, { padding: 40, maxZoom: 15, duration: 600 });    
 
-            const ne = bounds.getNorthEast(); // {lng, lat}
-            console.log("ne",ne)
-            const elevation = map.queryTerrainElevation([ne.lng, ne.lat], { exaggerated: false });
-    
-
-            console.log("Elevation at point:", elevation);
             document.getElementById("elevation").style.visibility = "visible";
             ElevationProfile.create(e.features[0].geometry, map).then(profile => {
                 renderElevationProfile(
@@ -742,9 +744,7 @@
                     );
             });
 
-            
         });
-
         const waypointTooltip = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
 
         map.on('click', 'waypoints', (e) => {
