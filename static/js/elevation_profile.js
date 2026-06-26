@@ -275,7 +275,7 @@ export function renderElevationProfile(
                             x2="0"
                             y2="1"
                         >
-                            <stop offset="0%" stop-color="#9be89b" />
+                            <stop offset="0%" stop-color="#0f1403" />
                             <stop offset="100%" stop-color="#eaf9ea" />
                         </linearGradient>
                     </defs>
@@ -372,7 +372,7 @@ export function renderElevationProfile(
                     <!-- Courbe du profil -->
                     <polyline
                         fill="none"
-                        stroke="#0066ff"
+                        stroke="#2ea44b"
                         stroke-width="2"
                         points="${profileLinePoints}"
                     />

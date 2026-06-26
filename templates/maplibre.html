@@ -672,12 +672,41 @@
             redraw();
         });
         const popup = new maplibregl.Popup({
-                closeButton: false,
-                closeOnClick: false
+                closeButton: true,
+                closeOnClick: true
             });
 
+        
+        map.on('mouseenter', "trails", (e) => {
+            map.getCanvas().style.cursor = 'pointer'
+            if (e.features.length > 0) {
+                if (hoveredStateId) {
+                    map.setFeatureState(
+                        { source: 'trails', id: hoveredStateId },
+                        { hover: false }
+                    );
+                }
+                hoveredStateId = e.features[0].id;
+                map.setFeatureState(
+                    { source: 'trails', id: hoveredStateId },
+                    { hover: true }
+                );
+            }
+        });
+        /*map.on('mouseleave', "trails", (e) => {
+            map.getCanvas().style.cursor = ''
+            if (hoveredStateId) {
+                map.setFeatureState(
+                    { source: 'trails', id: hoveredStateId },
+                    { hover: false }
+                );
+            }
+            hoveredStateId = null;
+        })
+        */
 
-        map.on('mouseover', 'trails', (e) => {
+        map.on('click', 'trails', (e) => {
+        //map.on('mouseover', 'trails', (e) => {
             const coordinates = e.features[0].geometry.coordinates.slice();
 
             // Ensure that if the map is zoomed out such that multiple
@@ -707,6 +736,7 @@
                 + (props.link ? ('<a href="' + props.link + '" target="_blank">View Link</a><br>') : '')
                 + '<a href="/track/' + props.id + '">Voir détail</a><br>'
                 + '</p>';
+            map.getCanvas().style.cursor = '';
 
             popup
                 .setLngLat(e.lngLat).setHTML(description)
@@ -715,8 +745,8 @@
             
         });
         map.on('mouseleave', 'trails', (e) => {
-            map.getCanvas().style.cursor = 'pointer';
-            popup.remove();
+            map.getCanvas().style.cursor = '';
+            //popup.remove();
         });
 
         map.on('click', 'trails', (e) => {
@@ -779,8 +809,7 @@
         });
 
         let hoveredStateId = null;
-
-        map.on('mouseenter', "trails", (e) => {
+        map.on('click', "trails", (e) => {
             // console.log("mouse enter", e);
             // if (e.features.length > 0) {
 
@@ -801,21 +830,6 @@
             }
             // }
         });
-        map.on('mouseleave', "trails", (e) => {
-            // console.log("mouse leave", e);
-            // if (e.features.length > 0) {
-
-            // map.setFeatureState({ source: 'trails', id: e.features[0].id }, { hover: false });
-            map.getCanvas().style.cursor = ''
-            if (hoveredStateId) {
-                map.setFeatureState(
-                    { source: 'trails', id: hoveredStateId },
-                    { hover: false }
-                );
-            }
-            hoveredStateId = null;
-            // }
-        })
         map.on('moveend', () => {
             redraw();
         });

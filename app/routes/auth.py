@@ -101,12 +101,13 @@ def home():
     user.uuid = info['sub']
     user.email = info['email']
     user_db = db.session.query(User).filter_by(
-        name=user.name).first()
+        uuid=user.uuid).first()
     if user_db is None:  # register the user if not already in the database
         db.session.add(user)
         db.session.commit()
+        user_db = user
     print(session['user'])
-    login_user(user, remember=True)
+    login_user(user_db, remember=True)
 
     return redirect('/explore/map')
 
@@ -117,7 +118,7 @@ def me():
     if 'user' not in session:
         return redirect(url_for('auth.login'))
     user = db.session.query(User).filter_by(
-        name=session['user']['name']).first()
+        uuid=session['user']['sub']).first()
 
     user_id = user.id
 #     print(user.collections)

@@ -6,8 +6,7 @@ flask --app main.py run --host 0.0.0.0
 
 persistence : (geo)alchemy sur postgre+gis (AIVEN) et geopandas
 authent : google + flask-login
-ergonomie : leaflet
-recherche de lieux : google places api
+ergonomie : maplibre
 
 build/run : docker build -t alltrail-map . && docker run -p 5000:5000 alltrail-map
 deployment : google cloud run + cloud build
@@ -53,6 +52,9 @@ Used APIs & tools :
 - google maps api for geocoding and places search
 - visualcrossing and open-meteo for weather forecast
 - maplibre for map visualization
+- open-meteo
+- foursquare (POI)
+- geoapify
 
 Elevation profile : 
 - profil d’élévation SVG ;
