@@ -134,6 +134,7 @@ def get_track(track_id):
 
 @bp.route('/tracks/<int:track_id>', methods=['DELETE'])
 def delete_track(track_id):
+    print(f"Deleting track with id: {track_id}")
     if 'user' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 

@@ -10,9 +10,12 @@
             <aside id="track-sidebar">
             <a href="javascript:history.back()">Lien retour</a>
             <h2 id="track-name">Chargement…</h2>
-            <div id="track-meta"></div>
-            <h3>Météo</h3>
+            <h3 class="sidebar-subheading">Caractéristiques</h3>
+            <div id="track-meta">Chargement…</div>
+            <h3 class="sidebar-subheading">Météo</h3>
             <div id="weather-info">Chargement météo…</div>
+            <h3 class="sidebar-subheading">Éphéméride</h3>
+            <div id="ephemeris-info">Chargement éphéméride…</div>
             <h3>Profil d'élévation</h3>
             <div id="elevation-profile"></div>
 
@@ -221,7 +224,7 @@
                     console.log("Bounds ", bounds);
                     const props = geo.features[0].properties || {};
                     document.getElementById('track-name').textContent = props.name || 'Sans nom';
-                    document.getElementById('track-meta').innerHTML = '<p>Type: '+(props.type||'')+'<br>Length: '+(Math.round(props.length/1000).toFixed(1)||'')+'km<br>Elevation gain: '+(Math.round(props.elevation_gain).toFixed(0)||'')+'m</p>';
+                    renderTrackMeta(props);
 
                     {% if is_owner %}
                     // prefill edit form
@@ -277,32 +280,125 @@
             }).catch(e => console.warn('Unable to load waypoints', e));
     }
 
+    function getActivityTypeIcon(type) {
+        const icons = {
+            RANDO: '🥾',
+            HIKE: '🥾',
+            OFFROAD: '🛻',
+            BIKE: '🚴',
+            RUN: '🏃'
+        };
+        return icons[(type || '').toUpperCase()] || '🧭';
+    }
+
+    function getActivityTypeLabel(type) {
+        const labels = {
+            RANDO: 'Rando',
+            HIKE: 'Randonnée',
+            OFFROAD: 'Off-road',
+            BIKE: 'Vélo',
+            RUN: 'Course'
+        };
+        return labels[(type || '').toUpperCase()] || (type || 'N/A');
+    }
+
+    function renderInfoRow(icon, label, value) {
+        return '<div class="sidebar-info-row">' +
+            '<span class="sidebar-info-icon">' + icon + '</span>' +
+            '<span>' + label + ' : <strong>' + value + '</strong></span>' +
+            '</div>';
+    }
+
+    function renderTrackMeta(props) {
+        const el = document.getElementById('track-meta');
+        if (!el) return;
+
+        const type = props.type || '';
+        const length = props.length ? (props.length / 1000).toFixed(1) + ' km' : 'N/A';
+        const gain = props.elevation_gain ? Math.round(props.elevation_gain) + ' m' : 'N/A';
+
+        el.innerHTML = '<div class="sidebar-info-block">' +
+            renderInfoRow(getActivityTypeIcon(type), 'Activité', getActivityTypeLabel(type)) +
+            renderInfoRow('📏', 'Distance', length) +
+            renderInfoRow('⛰️', 'Dénivelé', gain) +
+            '</div>';
+    }
+
+    function formatLocalTime(isoString) {
+        if (!isoString) return 'N/A';
+        return new Date(isoString).toLocaleTimeString('fr-FR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function moonPhaseLabel(phase) {
+        if (phase == null || Number.isNaN(Number(phase))) {
+            return { label: 'N/A', icon: '🌙' };
+        }
+        const p = Number(phase);
+        if (p <= 0.03 || p >= 0.97) return { label: 'Nouvelle lune', icon: '🌑' };
+        if (p < 0.22) return { label: 'Premier croissant', icon: '🌒' };
+        if (p < 0.28) return { label: 'Premier quartier', icon: '🌓' };
+        if (p < 0.47) return { label: 'Gibbeuse croissante', icon: '🌔' };
+        if (p < 0.53) return { label: 'Pleine lune', icon: '🌕' };
+        if (p < 0.72) return { label: 'Gibbeuse décroissante', icon: '🌖' };
+        if (p < 0.78) return { label: 'Dernier quartier', icon: '🌗' };
+        return { label: 'Dernier croissant', icon: '🌘' };
+    }
+
+    function renderEphemeris(data) {
+        const el = document.getElementById('ephemeris-info');
+        if (!el) return;
+
+        const daily = data.daily;
+        if (!daily || !Array.isArray(daily.time) || !daily.time.length) {
+            el.textContent = 'Éphéméride indisponible';
+            return;
+        }
+
+        const sunrise = daily.sunrise?.[0];
+        const sunset = daily.sunset?.[0];
+        const moon = moonPhaseLabel(daily.moon_phase?.[0]);
+
+        el.innerHTML =
+            '<div class="sidebar-info-block">' +
+            '<div class="sidebar-info-row"><span class="sidebar-info-icon">🌅</span><span>Lever du soleil : <strong>' + formatLocalTime(sunrise) + '</strong></span></div>' +
+            '<div class="sidebar-info-row"><span class="sidebar-info-icon">🌇</span><span>Coucher du soleil : <strong>' + formatLocalTime(sunset) + '</strong></span></div>' +
+            '<div class="sidebar-info-row"><span class="sidebar-info-icon">' + moon.icon + '</span><span>' + moon.label + '</span></div>' +
+            '</div>';
+    }
+
     function fetchWeatherAt(lat, lon){
         const el = document.getElementById('weather-info');
+        const ephemerisEl = document.getElementById('ephemeris-info');
         if (!el) return;
         el.textContent = 'Chargement météo…';
-        //const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=precipitation&current_weather=true&timezone=auto`;
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&current_weather=true&dailycurrent=temperature_2m,wind_speed_10m&hourly=weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation&forecast_days=1`;
+        if (ephemerisEl) ephemerisEl.textContent = 'Chargement éphéméride…';
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&current_weather=true&hourly=weather_code,temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation&daily=sunrise,sunset&forecast_days=1&timezone=auto`;
         fetch(url)
             .then(r => r.ok ? r.json() : Promise.reject(r))
             .then(w => {
                 const temp = w.current_weather && typeof w.current_weather.temperature !== 'undefined' ? w.current_weather.temperature : null;
                 let precip = null;
-                console.log('Weather data', w);
                 if (w.hourly && Array.isArray(w.hourly.time) && Array.isArray(w.hourly.precipitation)){
                     const times = w.hourly.time;
                     const precs = w.hourly.precipitation;
                     const now = new Date();
-                    // build ISO hour string like 2023-06-30T14:00
                     const isoHour = now.toISOString().slice(0,13)+':00';
                     let idx = times.indexOf(isoHour);
                     if (idx === -1) idx = 0;
                     precip = precs[idx];
                 }
-                el.innerHTML = '<p>Température: ' + (temp!==null ? (temp + ' °C') : 'N/A') + '<br>Précipitation (heure): ' + (precip!==null ? (precip + ' mm') : 'N/A') + '</p>';
+                el.innerHTML = '<div class="sidebar-info-block">' +
+                    renderInfoRow('🌡️', 'Température', temp !== null ? temp + ' °C' : 'N/A') +
+                    renderInfoRow('🌧️', 'Précipitation', precip !== null ? precip + ' mm' : 'N/A') +
+                    '</div>';
+                renderEphemeris(w);
             }).catch(e => {
                 console.warn('Unable to fetch weather', e);
                 el.textContent = 'Météo indisponible';
+                if (ephemerisEl) ephemerisEl.textContent = 'Éphéméride indisponible';
             });
     }
 

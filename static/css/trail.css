@@ -1446,6 +1446,41 @@
             margin-top: 10px;
         }
 
+        #track-sidebar .sidebar-subheading {
+            margin: 14px 0 8px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        #track-meta,
+        #weather-info,
+        #ephemeris-info {
+            font-size: 13px;
+            color: #444;
+            line-height: 1.5;
+        }
+
+        .sidebar-info-block {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+
+        .sidebar-info-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+        }
+
+        .sidebar-info-icon {
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
         #map {
             flex: 1;
             height: 100%;

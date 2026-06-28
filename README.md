@@ -65,3 +65,8 @@ Elevation profile :
 - tooltip avec distance, altitude, D+ cumulé et pente ;
 - événement profile-hover vers MapLibre ;
 - bouton intégré pour afficher / masquer le profil.
+
+Durée des randos :
+La durée s’affiche pour RANDO et HIKE, avec la logique :
+- durée GPX si disponible ;
+- sinon estimation Naismith (4 km/h + 600 m D+ / h), marquée ~.
