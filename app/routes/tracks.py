@@ -23,12 +23,12 @@ def find_tracks():
     AND ST_Y(ST_StartPoint(geom)) BETWEEN :SE_lat AND :NW_lat
     """)
     gdf_tracks = gpd.GeoDataFrame.from_postgis(
-        sql, 
+        sql,
         con=db.session.connection(),
         params={
-            "NW_lon": float(NW_lon) if NW_lon is not None else 0.0, 
-            "SE_lon": float(SE_lon) if SE_lon is not None else 0.0, 
-            "SE_lat": float(SE_lat) if SE_lat is not None else 0.0, 
+            "NW_lon": float(NW_lon) if NW_lon is not None else 0.0,
+            "SE_lon": float(SE_lon) if SE_lon is not None else 0.0,
+            "SE_lat": float(SE_lat) if SE_lat is not None else 0.0,
             "NW_lat": float(NW_lat) if NW_lat is not None else 0.0
         }
     )
@@ -57,7 +57,6 @@ def find_tracks():
         'sub') if 'user' in session else None
     gdf_tracks['is_owner'] = gdf_tracks['owner'].fillna(
         '').eq(current_user_uuid)
-    print(gdf_tracks)
     return gdf_tracks.to_json()
 
 
@@ -107,8 +106,8 @@ def get_track(track_id):
         WHERE id=:track_id
         """)
     gdf_tracks = gpd.GeoDataFrame.from_postgis(
-        sql, 
-        con=db.session.connection(), 
+        sql,
+        con=db.session.connection(),
         params={"track_id": track_id}
     )
     if gdf_tracks.empty:

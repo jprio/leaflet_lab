@@ -321,6 +321,16 @@
             });
         }
 
+        function getActivityTypeIcon(type) {
+            const icons = {
+                HIKE: '🥾',
+                OFFROAD: '🛻',
+                BIKE: '🚴',
+                RUN: '🏃'
+            };
+            return icons[(type || '').toUpperCase()] || '🧭';
+        }
+
         function renderTrackSidebar(geojson) {
             const list = document.getElementById('track-sidebar-list');
             if (!list) return;
@@ -338,7 +348,14 @@
                 const header = document.createElement('div');
                 header.className = 'track-item-header';
 
+                const typeIcon = document.createElement('span');
+                typeIcon.className = 'track-type-icon';
+                typeIcon.textContent = getActivityTypeIcon(props.type);
+                typeIcon.title = props.type || 'Type inconnu';
+                header.appendChild(typeIcon);
+
                 const title = document.createElement('h4');
+                title.className = 'track-item-title';
                 title.textContent = props.name || 'Sans nom';
                 header.appendChild(title);
 
@@ -349,11 +366,6 @@
                     deleteBtn.className = 'track-delete-btn';
                     deleteBtn.textContent = '🗑️';
                     deleteBtn.title = 'Supprimer cette trace';
-                    deleteBtn.style.marginLeft = 'auto';
-                    deleteBtn.style.background = 'transparent';
-                    deleteBtn.style.border = 'none';
-                    deleteBtn.style.cursor = 'pointer';
-                    deleteBtn.style.fontSize = '1.1rem';
                     deleteBtn.addEventListener('click', (ev) => {
                         ev.stopPropagation();
                         if (!confirm('Supprimer cette trace ?')) return;
@@ -364,18 +376,13 @@
 
                 item.appendChild(header);
 
-                const rows = [
-                    { icon: '📏', label: props.length ? `${(props.length / 1000).toFixed(1)} km` : 'N/A' },
-                    { icon: '⛰️', label: props.elevation_gain ? `${props.elevation_gain} m gain` : 'N/A' },
-                    { icon: '🧭', label: props.type || 'N/A' }
-                ];
-
-                rows.forEach(({ icon, label }) => {
-                    const attr = document.createElement('div');
-                    attr.className = 'track-attr';
-                    attr.innerHTML = `<span class="attr-icon">${icon}</span><span>${label}</span>`;
-                    item.appendChild(attr);
-                });
+                const stats = document.createElement('div');
+                stats.className = 'track-item-stats';
+                stats.innerHTML = [
+                    `<span class="track-stat"><span class="attr-icon">📏</span>${props.length ? `${(props.length / 1000).toFixed(1)} km` : 'N/A'}</span>`,
+                    `<span class="track-stat"><span class="attr-icon">⛰️</span>${props.elevation_gain ? `${props.elevation_gain} m` : 'N/A'}</span>`
+                ].join('');
+                item.appendChild(stats);
 
                 item.addEventListener('click', () => {
                     document.querySelectorAll('.track-item.selected').forEach((el) => el.classList.remove('selected'));

@@ -50,7 +50,7 @@ Run :
 
 Used APIs & tools :
 - google maps api for geocoding and places search
-- visualcrossing and open-meteo for weather forecast
+- visualcrossing and open-meteo for weather forecast. weather widget by visualcrossing
 - maplibre for map visualization
 - open-meteo
 - foursquare (POI)

@@ -1341,19 +1341,73 @@
         }
 
         .track-item {
-            padding: 14px;
-            margin-bottom: 14px;
-            background: #fff;
-            border: 1px solid #eee;
-            border-radius: 14px;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            transition: background 0.15s ease, transform 0.15s ease;
         }
 
-        .track-item h4 {
-            margin: 0 0 10px;
+        .track-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 24px;
+        }
+
+        .track-type-icon {
+            flex-shrink: 0;
+            width: 20px;
             font-size: 15px;
+            line-height: 1;
+            text-align: center;
+        }
+
+        .track-item-title {
+            flex: 1;
+            margin: 0;
+            min-width: 0;
+            font-size: 14px;
+            font-weight: 600;
             line-height: 1.3;
             color: #111;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .track-delete-btn {
+            flex-shrink: 0;
+            margin: 0;
+            padding: 2px 4px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            opacity: 0.55;
+            transition: opacity 0.15s ease;
+        }
+
+        .track-delete-btn:hover {
+            opacity: 1;
+        }
+
+        .track-item-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 6px;
+            padding-left: 28px;
+            color: #6b7280;
+            font-size: 12px;
+        }
+
+        .track-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .track-attr {
@@ -1365,28 +1419,24 @@
             font-size: 13px;
         }
 
-        .track-attr .attr-icon {
-            width: 18px;
-            height: 18px;
+        .track-attr .attr-icon,
+        .track-stat .attr-icon {
+            width: 16px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-        }
-
-        .track-item {
-            transition: background 0.15s ease, transform 0.15s ease;
+            font-size: 12px;
         }
 
         .track-item:hover {
             cursor: pointer;
-            background: #f5fbff;
+            background: #eceef1;
             transform: translateX(1px);
         }
 
         .track-item.selected {
             border-color: #4caf50;
-            background: #edf8f1;
+            background: #e8f5ec;
         }
 
         #track-sidebar-empty {
