@@ -16,7 +16,7 @@ const demSource = new mlcontour.DemSource({
     timeoutMs: 10_000,
 })
 // console.log(initialStyle);
-demSource.setupMaplibre(maplibregl);
+// demSource.setupMaplibre(maplibregl);
 const osm2 = {
     name: "Open Street Map",
     tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],

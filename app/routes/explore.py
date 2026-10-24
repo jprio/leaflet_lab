@@ -22,4 +22,4 @@ def explore():
             current_user_uuid = current_user.uuid
 
     return render_template(
-        'map.html', user_collections=user_collections, current_user_uuid=current_user_uuid)
+        'maplibre.html', user_collections=user_collections, current_user_uuid=current_user_uuid)

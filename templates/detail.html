@@ -1,9 +1,15 @@
 <br>{% extends "base.html" %}
-{% block content %}
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.13.0/d3.min.js"></script>
 <link rel="stylesheet" href="https://www.visualcrossing.com/widgets/forecast/weather-forecast-widget-d3.css">
 <script src="https://unpkg.com/maplibre-basemaps@0.0.6/dist/maplibre-basemaps.js"></script>
+
+
+
+{% block content %}
+<script type="module"> 
+    import * as maplibregl from 'https://unpkg.com/maplibre-gl@^6.0.0/dist/maplibre-gl.mjs';
+    </script>
 <script src="/js/baseMapControl.js"></script>
 </style>
         <div id="map-and-sidebar">
@@ -44,7 +50,7 @@
         </aside>
         <div id="map"></div>
     </div>
-<script>
+<script type="module">  
     const trackId = {{ track_id }};
     const search_control = new maplibreSearchBox.MapLibreSearchControl({
         useMapFocusPoint: true,
@@ -52,6 +58,7 @@
             // console.log(feature.geometry.coordinates);
         }
     });
+    import * as maplibregl from 'https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.mjs';
 
     const map = new maplibregl.Map({
         container: 'map',
@@ -422,5 +429,5 @@
 <div class="weatherForecastWidget" style="background-color: #ffffff99;height: 175px;"></div>
 
 
-<script src="{{ url_for('static', filename='js/elevation-profile.js') }}"></script>
+<script src="{{ url_for('static', filename='js/elevation-profile.js') }}" type="module"></script>
 {% endblock %}

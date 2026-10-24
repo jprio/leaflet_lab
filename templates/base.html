@@ -8,7 +8,10 @@
     <meta charset='utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css' />
-    <script src='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js'></script>
+<script type='module'>
+import * as maplibregl from 'https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.mjs';
+</script>
+
     <script src="https://unpkg.com/browse/@stadiamaps/maplibre-search-box/dist/maplibre-search-box.umd.js"
         type="application/javascript"></script>
     <script src="https://unpkg.com/@stadiamaps/maplibre-search-box/dist/maplibre-search-box.umd.js"></script>
@@ -19,7 +22,6 @@
     <link href="https://cdn.maptiler.com/maptiler-sdk-js/v4.0.2/maptiler-sdk.css" rel="stylesheet" />
     <!-- <link href="https://unpkg.com/maplibre-gl-layer-manager@latest/src/layer-manager.css" rel="stylesheet" />
     <script src="https://unpkg.com/maplibre-gl-layer-manager@latest/src/layer-manager.js"></script> -->
-    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
     <!-- <script src="../dist/maplibre-gl-layers-control.min.js"></script> -->
     <script src="https://unpkg.com/maplibre-basemaps@0.0.6/dist/maplibre-basemaps.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/trail.css') }}" />
